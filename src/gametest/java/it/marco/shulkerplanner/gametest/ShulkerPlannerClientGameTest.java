@@ -41,12 +41,17 @@ import it.marco.shulkerplanner.data.PlannerProject;
 import it.marco.shulkerplanner.data.PlannerSession;
 import it.marco.shulkerplanner.data.ProjectStorage;
 import it.marco.shulkerplanner.data.Reminder;
+import it.marco.shulkerplanner.config.HudBoxView;
+import it.marco.shulkerplanner.config.HudCountFormat;
+import it.marco.shulkerplanner.gui.GuiHudEditor;
 import it.marco.shulkerplanner.gui.GuiPlannerConfigs;
 import it.marco.shulkerplanner.gui.PlannerGuis;
 import it.marco.shulkerplanner.gui.PlannerTab;
+import it.marco.shulkerplanner.plan.BoxProgress;
 import it.marco.shulkerplanner.plan.PlannedBox;
 import it.marco.shulkerplanner.plan.PlannedStack;
 import it.marco.shulkerplanner.plan.ShulkerPlan;
+import it.marco.shulkerplanner.render.HudRenderer;
 import it.marco.shulkerplanner.util.BoxItemFactory;
 import it.marco.shulkerplanner.util.InventoryScanner;
 
@@ -216,6 +221,19 @@ public class ShulkerPlannerClientGameTest implements FabricClientGameTest
         log("Half filled: assistant target #%d, done=%s", targetHalf, doneHalf);
         check(targetHalf == 6, "the assistant should recognize the partially filled box #6");
         check(doneHalf == false, "a half filled box must not be marked as done");
+
+        int halfCount = 0;
+        for (int i = 0; i < box6.size() / 2; ++i)
+        {
+            halfCount += box6.get(i).getCount();
+        }
+
+        int[] live = ctx.computeOnClient(mc -> {
+            BoxProgress p = PlannerSession.INSTANCE.getCurrentProgress();
+            return new int[] { p.getBox().getIndex(), p.getInBox(), p.isContentsKnown() ? 1 : 0, p.getMissing() };
+        });
+        log("HUD live progress: box #%d, %d items inside (expected %d), known=%d, missing=%d", live[0], live[1], halfCount, live[2], live[3]);
+        check(live[0] == 6 && live[1] == halfCount && live[2] == 1, "the HUD does not follow the contents of the open box");
         shot(ctx, "check_assistant_half");
 
         fillShulker(sp, pos, box6, box6.size() / 2, box6.size());
@@ -235,6 +253,64 @@ public class ShulkerPlannerClientGameTest implements FabricClientGameTest
         log("Ready boxes after re-opening the complete box: %d", readyAfterReopen);
         check(readyAfterReopen == 1, "re-opening a complete box changed the done count");
         ctx.runOnClient(mc -> mc.player.closeContainer());
+
+        // --- A partially filled box carried in the inventory is shown on the HUD
+        sp.getServer().runCommand("clear @a");
+        ctx.runOnClient(mc -> {
+            PlannerProject project = PlannerSession.INSTANCE.getProject();
+            PlannerSession.INSTANCE.setFocusedBox(2);
+            List<PlannedBox> boxes = PlannerSession.INSTANCE.getPlan().getBoxes();
+            ItemStack partial = BoxItemFactory.createBoxItem(project, boxes.get(2), boxes.size());
+            List<ItemStack> half = new ArrayList<>();
+
+            for (int i = 0; i < 10; ++i)
+            {
+                half.add(boxes.get(2).getSlots().get(i).createStack());
+            }
+
+            partial.set(DataComponents.CONTAINER, ItemContainerContents.fromItems(half));
+            BoxItemFactory.giveToPlayer(partial);
+        });
+        // Let the creative slot packet arrive first, the give command could otherwise use the same slot
+        ctx.waitTicks(5);
+        sp.getServer().runCommand("give @a minecraft:oak_planks 100");
+        ctx.waitTicks(10);
+
+        int[] carried = ctx.computeOnClient(mc -> {
+            BoxProgress p = PlannerSession.INSTANCE.getCurrentProgress();
+            return new int[] { p.getBox().getIndex(), p.getInBox(), p.getInInventory(), p.isContentsKnown() ? 1 : 0 };
+        });
+        log("Partial box in the inventory: box #%d, inside=%d, loose=%d, known=%d", carried[0], carried[1], carried[2], carried[3]);
+        check(carried[0] == 3 && carried[1] == 640 && carried[2] == 100 && carried[3] == 1, "the partially filled box in the inventory is not shown");
+
+        // --- The HUD can be dragged in the editor
+        ctx.runOnClient(mc -> {
+            Configs.Generic.HUD_ENABLED.setBooleanValue(true);
+            Configs.Generic.HUD_X.setIntegerValue(4);
+            Configs.Generic.HUD_Y.setIntegerValue(40);
+            mc.gui.setScreen(new GuiHudEditor(null));
+        });
+        ctx.waitTicks(5);
+
+        int[] moved = ctx.computeOnClient(mc -> {
+            GuiHudEditor editor = (GuiHudEditor) mc.gui.screen();
+            HudRenderer hud = HudRenderer.INSTANCE;
+            int x = hud.getLastX() + 10;
+            int y = hud.getLastY() + 10;
+            editor.mouseClicked(new MouseButtonEvent(x, y, new MouseButtonInfo(ScanCodes.OFFSET_MOUSE_LEFT, 0)), false);
+            editor.mouseDragged(new MouseButtonEvent(x + 120, y + 30, new MouseButtonInfo(ScanCodes.OFFSET_MOUSE_LEFT, 0)), 120, 30);
+            editor.mouseReleased(new MouseButtonEvent(x + 120, y + 30, new MouseButtonInfo(ScanCodes.OFFSET_MOUSE_LEFT, 0)));
+            return new int[] { Configs.Generic.HUD_X.getIntegerValue(), Configs.Generic.HUD_Y.getIntegerValue() };
+        });
+        log("HUD dragged to %d, %d", moved[0], moved[1]);
+        check(moved[0] == 124 && moved[1] == 70, "dragging the HUD did not move it");
+        ctx.runOnClient(mc -> {
+            Configs.Generic.HUD_X.setIntegerValue(4);
+            Configs.Generic.HUD_Y.setIntegerValue(40);
+            Configs.Generic.HUD_ENABLED.setBooleanValue(false);
+            mc.gui.setScreen(null);
+        });
+        sp.getServer().runCommand("clear @a");
 
         // --- Export: always one single file per project
         int exports = ctx.computeOnClient(mc -> {
@@ -384,13 +460,6 @@ public class ShulkerPlannerClientGameTest implements FabricClientGameTest
         ctx.runOnClient(mc -> mc.gui.setScreen(new InventoryScreen(mc.player)));
         shot(ctx, "05_inventory_created_boxes");
 
-        ctx.runOnClient(mc -> {
-            Configs.Generic.HUD_ENABLED.setBooleanValue(true);
-            mc.gui.setScreen(null);
-        });
-        ctx.waitTicks(25);
-        shot(ctx, "06_hud");
-
         ctx.runOnClient(mc -> GuiBase.openGui(PlannerGuis.create(PlannerTab.BOXES, null)));
         shot(ctx, "07_boxes_progress");
 
@@ -424,6 +493,32 @@ public class ShulkerPlannerClientGameTest implements FabricClientGameTest
         openShulker(ctx, sp, pos);
         shot(ctx, "08_packing_assistant");
         ctx.runOnClient(mc -> mc.player.closeContainer());
+
+        // The HUD keeps showing the box just filled, in the three views
+        ctx.runOnClient(mc -> {
+            Configs.Generic.HUD_ENABLED.setBooleanValue(true);
+            Configs.Generic.HUD_BOX_VIEW.setOptionListValue(HudBoxView.BOTH);
+            mc.gui.setScreen(null);
+        });
+        ctx.waitTicks(25);
+        shot(ctx, "06_hud");
+
+        ctx.runOnClient(mc -> Configs.Generic.HUD_BOX_VIEW.setOptionListValue(HudBoxView.SHULKER));
+        shot(ctx, "06b_hud_shulker");
+
+        ctx.runOnClient(mc -> {
+            Configs.Generic.HUD_BOX_VIEW.setOptionListValue(HudBoxView.COMPACT);
+            Configs.Generic.HUD_COUNT_FORMAT.setOptionListValue(HudCountFormat.ITEMS);
+        });
+        shot(ctx, "06c_hud_compact");
+
+        ctx.runOnClient(mc -> {
+            Configs.Generic.HUD_BOX_VIEW.setOptionListValue(HudBoxView.BOTH);
+            Configs.Generic.HUD_COUNT_FORMAT.setOptionListValue(HudCountFormat.STACKS);
+            mc.gui.setScreen(new GuiHudEditor(null));
+        });
+        shot(ctx, "11_hud_editor");
+        ctx.runOnClient(mc -> mc.gui.setScreen(null));
 
         ctx.runOnClient(mc -> GuiBase.openGui(new GuiMainMenu()));
         shot(ctx, "09_litematica_main_menu");

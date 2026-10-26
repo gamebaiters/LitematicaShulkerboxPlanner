@@ -169,6 +169,12 @@ public abstract class GuiPlannerBase<TYPE, WIDGET extends WidgetListEntryBase<TY
         });
         xRight = hudButton.getX() - 2;
 
+        ButtonGeneric moveHud = new ButtonGeneric(xRight, y, -1, 20, StringUtils.translate("shulkerplanner.gui.button.edit_hud"),
+                                                  StringUtils.translate("shulkerplanner.gui.button.edit_hud.hover"));
+        moveHud.setPosition(xRight - moveHud.getWidth(), y);
+        this.addButton(moveHud, (btn, mouseButton) -> GuiBase.openGui(new GuiHudEditor(this)));
+        xRight = moveHud.getX() - 2;
+
         MaterialListBase materialList = this.session.getMaterialList();
 
         if (materialList != null && (this.getParent() instanceof GuiMaterialList) == false)

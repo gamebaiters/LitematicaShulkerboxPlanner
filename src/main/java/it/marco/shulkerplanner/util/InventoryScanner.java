@@ -1,6 +1,8 @@
 package it.marco.shulkerplanner.util;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -138,6 +140,33 @@ public class InventoryScanner
         }
 
         return map;
+    }
+
+    /**
+     * @return the contents of every non-empty shulker box in the player inventory
+     */
+    public static List<Map<String, Integer>> getShulkerContentsList(@Nullable Player player)
+    {
+        List<Map<String, Integer>> list = new ArrayList<>();
+
+        if (player == null)
+        {
+            return list;
+        }
+
+        Inventory inv = player.getInventory();
+
+        for (int slot : SCANNED_SLOTS)
+        {
+            Map<String, Integer> contents = getShulkerContents(inv.getItem(slot));
+
+            if (contents != null && contents.isEmpty() == false)
+            {
+                list.add(contents);
+            }
+        }
+
+        return list;
     }
 
     /**

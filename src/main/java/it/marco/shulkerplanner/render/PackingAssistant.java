@@ -204,6 +204,7 @@ public class PackingAssistant
 
         // The HUD follows the box that is being filled
         session.setFocusedBox(target.getIndex() - 1);
+        session.setLiveBox(target.getIndex() - 1, contents);
         Map<String, Integer> planned = target.getTotals();
         boolean complete = contents.equals(new HashMap<>(planned));
         Font font = Minecraft.getInstance().font;

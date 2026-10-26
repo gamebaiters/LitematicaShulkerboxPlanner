@@ -1,5 +1,6 @@
 package it.marco.shulkerplanner.data;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -10,13 +11,21 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.item.ItemStack;
 
+import fi.dy.masa.litematica.data.DataManager;
 import fi.dy.masa.litematica.materials.MaterialListBase;
+import fi.dy.masa.litematica.materials.MaterialListPlacement;
+import fi.dy.masa.litematica.materials.MaterialListSchematic;
+import fi.dy.masa.litematica.schematic.LitematicaSchematic;
+import fi.dy.masa.litematica.schematic.placement.SchematicPlacement;
 import fi.dy.masa.litematica.materials.MaterialListEntry;
 import fi.dy.masa.malilib.interfaces.IClientTickHandler;
 import fi.dy.masa.malilib.interfaces.ICompletionListener;
 
 import it.marco.shulkerplanner.config.Configs;
 import it.marco.shulkerplanner.mixin.IMixinMaterialListBase;
+import it.marco.shulkerplanner.mixin.IMixinMaterialListPlacement;
+import it.marco.shulkerplanner.mixin.IMixinMaterialListSchematic;
+import it.marco.shulkerplanner.plan.BoxProgress;
 import it.marco.shulkerplanner.plan.CountMode;
 import it.marco.shulkerplanner.plan.PlannedBox;
 import it.marco.shulkerplanner.plan.ShulkerPacker;
@@ -42,6 +51,12 @@ public class PlannerSession implements IClientTickHandler
     private Map<String, Integer> inventoryBoxes = new HashMap<>();
     private boolean waitingForMaterialList;
     private int tickCounter;
+    /** The contents of a box seen in its screen by the packing assistant, for the HUD */
+    private int liveBox = -1;
+    private Map<String, Integer> liveContents = new HashMap<>();
+    /** Contents of the non-empty shulker boxes in the inventory, to show partially filled boxes on the HUD */
+    private List<Map<String, Integer>> inventoryShulkers = new ArrayList<>();
+    @Nullable private Object lastSelectedPlacement;
 
     private PlannerSession()
     {
@@ -82,6 +97,11 @@ public class PlannerSession implements IClientTickHandler
         this.switchProject(list.getName());
         this.linkMaterialList(list);
 
+        if (this.project != null)
+        {
+            this.project.setSchematicName(getSchematicName(list));
+        }
+
         // An empty list is most likely a placement list whose counting task hasn't finished yet
         this.waitingForMaterialList = list.getMaterialsAll().isEmpty();
 
@@ -114,9 +134,47 @@ public class PlannerSession implements IClientTickHandler
             this.project = ProjectStorage.load(name);
             this.materialList = null;
             this.focusedBox = -1;
+            this.liveBox = -1;
+            this.liveContents = new HashMap<>();
         }
 
         Configs.Generic.LAST_PROJECT.setValueFromString(name);
+    }
+
+    /**
+     * @return the name of the schematic behind a Litematica material list
+     */
+    public static String getSchematicName(MaterialListBase list)
+    {
+        try
+        {
+            if (list instanceof MaterialListPlacement)
+            {
+                SchematicPlacement placement = ((IMixinMaterialListPlacement) list).shulkerplanner_getPlacement();
+                LitematicaSchematic schematic = placement != null ? placement.getSchematic() : null;
+
+                if (schematic != null && schematic.getMetadata().getName() != null && schematic.getMetadata().getName().isEmpty() == false)
+                {
+                    return schematic.getMetadata().getName();
+                }
+
+                return placement != null ? placement.getName() : list.getName();
+            }
+            else if (list instanceof MaterialListSchematic)
+            {
+                LitematicaSchematic schematic = ((IMixinMaterialListSchematic) list).shulkerplanner_getSchematic();
+
+                if (schematic != null && schematic.getMetadata().getName() != null && schematic.getMetadata().getName().isEmpty() == false)
+                {
+                    return schematic.getMetadata().getName();
+                }
+            }
+        }
+        catch (Exception ignore)
+        {
+        }
+
+        return list.getName();
     }
 
     private void linkMaterialList(MaterialListBase list)
@@ -259,6 +317,79 @@ public class PlannerSession implements IClientTickHandler
         return this.loose.getOrDefault(id, 0);
     }
 
+    /**
+     * Called by the packing assistant every frame while a shulker box screen is open
+     */
+    public void setLiveBox(int index, Map<String, Integer> contents)
+    {
+        this.liveBox = index;
+        this.liveContents = contents;
+    }
+
+    /**
+     * @return the state of the box being filled: what is already inside it, what the player carries
+     * and what is still missing. Null when there is no box to fill.
+     */
+    @Nullable
+    public BoxProgress getCurrentProgress()
+    {
+        PlannedBox box = this.getCurrentBox();
+
+        if (box == null)
+        {
+            return null;
+        }
+
+        if (this.liveBox == box.getIndex() - 1)
+        {
+            return BoxProgress.compute(box, this.liveContents, this.loose, true);
+        }
+
+        // A partially filled shulker box in the inventory that belongs to this box
+        Map<String, Integer> best = null;
+        int bestCount = 0;
+
+        for (Map<String, Integer> contents : this.inventoryShulkers)
+        {
+            int count = 0;
+            boolean fits = true;
+
+            for (Map.Entry<String, Integer> e : contents.entrySet())
+            {
+                int planned = box.getTotals().getOrDefault(e.getKey(), 0);
+
+                if (e.getValue() > planned)
+                {
+                    fits = false;
+                    break;
+                }
+
+                count += e.getValue();
+            }
+
+            if (fits && count > bestCount)
+            {
+                best = contents;
+                bestCount = count;
+            }
+        }
+
+        if (best != null)
+        {
+            return BoxProgress.compute(box, best, this.loose, true);
+        }
+
+        return BoxProgress.compute(box, Map.of(), this.loose, false);
+    }
+
+    /**
+     * @return the name shown on the HUD: the schematic name of the active project
+     */
+    public String getDisplayName()
+    {
+        return this.project != null ? this.project.getSchematicName() : "";
+    }
+
     public void setFocusedBox(int index)
     {
         this.focusedBox = index;
@@ -345,6 +476,7 @@ public class PlannerSession implements IClientTickHandler
 
         Map<String, Integer> newAvailable = InventoryScanner.countAvailableItems(mc.player);
         Map<String, Integer> newBoxes = InventoryScanner.getShulkerSignatures(mc.player);
+        this.inventoryShulkers = InventoryScanner.getShulkerContentsList(mc.player);
         this.loose = InventoryScanner.countLooseItems(mc.player);
         boolean availableChanged = newAvailable.equals(this.available) == false;
         boolean boxesChanged = newBoxes.equals(this.inventoryBoxes) == false;
@@ -438,15 +570,59 @@ public class PlannerSession implements IClientTickHandler
             return;
         }
 
+        // The HUD shows what the player carries for the current box: keep it updated every tick
+        this.loose = InventoryScanner.countLooseItems(mc.player);
+
         if (++this.tickCounter >= 20)
         {
             this.tickCounter = 0;
             this.refreshInventory(true);
+            this.followSelectedPlacement();
         }
-        else if (this.tickCounter % 5 == 0)
+        else if (this.tickCounter % 4 == 0)
         {
-            // The HUD shows the loose items of the current box, keep those responsive
-            this.loose = InventoryScanner.countLooseItems(mc.player);
+            this.inventoryShulkers = InventoryScanner.getShulkerContentsList(mc.player);
+        }
+    }
+
+    /**
+     * Switches to the saved project of the placement selected in Litematica, if there is one
+     */
+    private void followSelectedPlacement()
+    {
+        if (Configs.Generic.HUD_FOLLOW_PLACEMENT.getBooleanValue() == false)
+        {
+            return;
+        }
+
+        SchematicPlacement placement = DataManager.getSchematicPlacementManager().getSelectedSchematicPlacement();
+
+        if (placement == null || placement == this.lastSelectedPlacement)
+        {
+            return;
+        }
+
+        this.lastSelectedPlacement = placement;
+
+        if (this.project != null && this.project.getName().equals(placement.getName()))
+        {
+            return;
+        }
+
+        if (ProjectStorage.exists(placement.getName()))
+        {
+            MaterialListBase list = placement.getMaterialList();
+
+            if (list != null && list.getMaterialsAll().isEmpty() == false)
+            {
+                this.openForMaterialList(list);
+            }
+            else
+            {
+                this.openProject(placement.getName());
+            }
+
+            this.notifyUpdate();
         }
     }
 
@@ -460,6 +636,10 @@ public class PlannerSession implements IClientTickHandler
         this.available = new HashMap<>();
         this.loose = new HashMap<>();
         this.inventoryBoxes = new HashMap<>();
+        this.inventoryShulkers = new ArrayList<>();
+        this.liveBox = -1;
+        this.liveContents = new HashMap<>();
+        this.lastSelectedPlacement = null;
         this.invalidate();
 
         if (joined && this.project == null)

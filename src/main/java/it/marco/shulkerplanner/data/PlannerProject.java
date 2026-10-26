@@ -42,6 +42,7 @@ public class PlannerProject
     private final Map<String, Integer> doneBoxes = new HashMap<>();
     private final List<Reminder> reminders = new ArrayList<>();
     private String sourceTitle = "";
+    private String schematicName = "";
     private long materialsUpdated;
 
     private CountMode countMode = CountMode.MISSING;
@@ -76,6 +77,19 @@ public class PlannerProject
         this.materials.addAll(materials);
         this.sourceTitle = sourceTitle;
         this.materialsUpdated = System.currentTimeMillis();
+    }
+
+    /**
+     * @return the name of the schematic this project was created for, or the project name if unknown
+     */
+    public String getSchematicName()
+    {
+        return this.schematicName.isEmpty() ? this.name : this.schematicName;
+    }
+
+    public void setSchematicName(String schematicName)
+    {
+        this.schematicName = schematicName != null ? schematicName : "";
     }
 
     public String getSourceTitle()
@@ -416,6 +430,7 @@ public class PlannerProject
 
         obj.addProperty("name", this.name);
         obj.addProperty("source_title", this.sourceTitle);
+        obj.addProperty("schematic_name", this.schematicName);
         obj.addProperty("materials_updated", this.materialsUpdated);
 
         JsonObject options = new JsonObject();
@@ -452,6 +467,7 @@ public class PlannerProject
         PlannerProject project = new PlannerProject(JsonUtils.getStringOrDefault(obj, "name", fallbackName));
 
         project.sourceTitle = JsonUtils.getStringOrDefault(obj, "source_title", "");
+        project.schematicName = JsonUtils.getStringOrDefault(obj, "schematic_name", "");
         project.materialsUpdated = JsonUtils.getLongOrDefault(obj, "materials_updated", 0L);
 
         if (JsonUtils.hasObject(obj, "options"))

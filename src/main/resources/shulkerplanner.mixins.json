@@ -5,6 +5,8 @@
 	"minVersion": "0.8",
 	"client": [
 		"IMixinMaterialListBase",
+		"IMixinMaterialListPlacement",
+		"IMixinMaterialListSchematic",
 		"MixinAbstractContainerScreen",
 		"MixinGuiMainMenu",
 		"MixinGuiMaterialList"

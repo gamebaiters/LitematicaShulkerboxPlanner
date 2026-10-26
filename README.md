@@ -43,14 +43,23 @@ Open any shulker box and a panel appears next to it.
 <p align="center"><img src="docs/images/screenshots/packing-assistant.png" width="85%"></p>
 
 ### In-game HUD
-A compact overlay with:
-- the project's progress;
-- the box you're working on, with every item you still need (counting what's loose in your inventory);
+An overlay that follows you while you build and pack:
+- the **schematic name** and the overall progress;
+- the box you're filling, drawn as the **real shulker box interface**. Every slot is colored: already inside, in your inventory ready to put in, partially there, or missing;
+- a compact list of **what's still missing**, in stacks (`2 x 64 + 12`) or plain numbers;
+- items that ended up in the wrong box;
 - your open reminders.
 
-Toggle it with **M + H** or the *HUD* button in the planner.
+Everything updates live. The box's contents are tracked while it's open, and a half-filled box in your inventory is recognized too.
+
+Toggle it with **M + H**. Drag it anywhere with **M + J** (or *Move HUD* in the planner), where you can also switch between the *Shulker box*, *Compact* and *both* views.
 
 <p align="center"><img src="docs/images/screenshots/hud.png" width="85%"></p>
+<p align="center">
+  <img src="docs/images/screenshots/hud-shulker.png" width="32%">
+  <img src="docs/images/screenshots/hud-compact.png" width="32%">
+  <img src="docs/images/screenshots/hud-editor.png" width="32%">
+</p>
 
 ### Materials and reminders
 - **Materials tab:**
@@ -87,7 +96,8 @@ Toggle it with **M + H** or the *HUD* button in the planner.
 |---|---|
 | `M + B` | Open the planner for the current material list / selected placement |
 | `M + H` | Toggle the HUD |
-| *(unbound)* | Open the reminders page, open the configuration |
+| `M + J` | Move the HUD / change its view |
+| *(unbound)* | Cycle the HUD view, open the reminders page, open the configuration |
 
 All hotkeys and options can be changed in the configuration screen. It's reachable from Mod Menu, the malilib config list, or the planner itself.
 

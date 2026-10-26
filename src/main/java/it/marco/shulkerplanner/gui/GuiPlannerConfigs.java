@@ -26,6 +26,9 @@ public class GuiPlannerConfigs extends GuiConfigsBase
 
         ButtonGeneric button = new ButtonGeneric(10, 26, -1, false, "shulkerplanner.gui.button.open_planner");
         this.addButton(button, (btn, mb) -> PlannerGuis.openPlanner(this, null));
+
+        ButtonGeneric hud = new ButtonGeneric(button.getX() + button.getWidth() + 4, 26, -1, false, "shulkerplanner.gui.button.edit_hud");
+        this.addButton(hud, (btn, mb) -> fi.dy.masa.malilib.gui.GuiBase.openGui(new GuiHudEditor(this)));
     }
 
     @Override

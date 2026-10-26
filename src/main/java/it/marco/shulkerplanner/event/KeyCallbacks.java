@@ -8,6 +8,8 @@ import fi.dy.masa.malilib.util.InfoUtils;
 
 import it.marco.shulkerplanner.config.Configs;
 import it.marco.shulkerplanner.config.Hotkeys;
+import it.marco.shulkerplanner.config.HudBoxView;
+import it.marco.shulkerplanner.gui.GuiHudEditor;
 import it.marco.shulkerplanner.gui.GuiPlannerConfigs;
 import it.marco.shulkerplanner.gui.PlannerGuis;
 import it.marco.shulkerplanner.gui.PlannerTab;
@@ -44,6 +46,18 @@ public class KeyCallbacks
                 boolean enabled = ! Configs.Generic.HUD_ENABLED.getBooleanValue();
                 Configs.Generic.HUD_ENABLED.setBooleanValue(enabled);
                 InfoUtils.printActionbarMessage(enabled ? "shulkerplanner.message.hud_enabled" : "shulkerplanner.message.hud_disabled");
+                return true;
+            }
+            else if (key == Hotkeys.EDIT_HUD.getKeybind())
+            {
+                GuiBase.openGui(new GuiHudEditor(null));
+                return true;
+            }
+            else if (key == Hotkeys.CYCLE_HUD_VIEW.getKeybind())
+            {
+                HudBoxView view = Configs.Generic.getHudBoxView().cycle(true);
+                Configs.Generic.HUD_BOX_VIEW.setOptionListValue(view);
+                InfoUtils.printActionbarMessage("shulkerplanner.message.hud_view", view.getDisplayName());
                 return true;
             }
             else if (key == Hotkeys.OPEN_CONFIG.getKeybind())

@@ -18,27 +18,43 @@ import fi.dy.masa.malilib.util.StringUtils;
 
 import it.marco.shulkerplanner.Reference;
 import it.marco.shulkerplanner.config.Configs;
+import it.marco.shulkerplanner.config.HudBoxView;
+import it.marco.shulkerplanner.config.HudCountFormat;
 import it.marco.shulkerplanner.data.MaterialRow;
 import it.marco.shulkerplanner.data.PlannerProject;
 import it.marco.shulkerplanner.data.PlannerSession;
 import it.marco.shulkerplanner.data.Reminder;
-import it.marco.shulkerplanner.plan.ItemRequirement;
+import it.marco.shulkerplanner.plan.BoxProgress;
 import it.marco.shulkerplanner.plan.PlannedBox;
 import it.marco.shulkerplanner.plan.ShulkerPlan;
 import it.marco.shulkerplanner.util.Format;
 
 /**
- * The in-game HUD: active project, progress, the shulker box being filled with what's
- * still missing for it, and the open reminders.
+ * The in-game HUD: the schematic, the progress, the shulker box being filled (as the real
+ * box interface and/or a compact list of what's missing) and the open reminders.
+ * Everything is re-calculated every frame from the session, which follows the inventory every tick.
  */
 public class HudRenderer implements IRenderer
 {
     public static final HudRenderer INSTANCE = new HudRenderer();
 
+    public static final int COLOR_IN_BOX = 0xFF4CA64C;
+    public static final int COLOR_IN_INVENTORY = 0xFF3F8FBF;
+    public static final int COLOR_PARTIAL = 0xFFC9A227;
+    public static final int COLOR_MISSING = 0xFFB34444;
+
     private static final int TEXT_LINE = 10;
     private static final int ITEM_LINE = 17;
     private static final int PADDING = 4;
-    private static final int MAX_TEXT_WIDTH = 240;
+    private static final int MAX_TEXT_WIDTH = 250;
+    private static final int SLOT = 18;
+    private static final int GRID_WIDTH = 9 * SLOT + 8;
+    private static final int GRID_HEIGHT = 3 * SLOT + 8;
+
+    private int lastX;
+    private int lastY;
+    private int lastWidth;
+    private int lastHeight;
 
     @Override
     public Supplier<String> getProfilerSectionSupplier()
@@ -58,65 +74,102 @@ public class HudRenderer implements IRenderer
             return;
         }
 
-        PlannerProject project = PlannerSession.INSTANCE.getProject();
-
-        if (project != null)
-        {
-            this.render(ctx, project, PlannerSession.INSTANCE);
-        }
+        this.render(ctx);
     }
 
-    private void render(GuiContext ctx, PlannerProject project, PlannerSession session)
+    /**
+     * @return true if something was drawn
+     */
+    public boolean render(GuiContext ctx)
     {
-        List<Line> lines = new ArrayList<>();
+        PlannerSession session = PlannerSession.INSTANCE;
+        PlannerProject project = session.getProject();
+
+        if (project == null)
+        {
+            this.lastWidth = 0;
+            this.lastHeight = 0;
+            return false;
+        }
+
+        List<Element> elements = new ArrayList<>();
         ShulkerPlan plan = session.getPlan();
 
-        lines.add(Line.text(GuiBase.TXT_LIGHT_PURPLE + GuiBase.TXT_BOLD + Format.trim(project.getName(), MAX_TEXT_WIDTH)));
+        elements.add(Line.text(GuiBase.TXT_LIGHT_PURPLE + GuiBase.TXT_BOLD + Format.trim(session.getDisplayName(), MAX_TEXT_WIDTH)));
 
         if (Configs.Generic.HUD_SHOW_PROGRESS.getBooleanValue())
         {
-            this.addProgress(lines, project, session, plan);
+            this.addProgress(elements, project, session, plan);
         }
 
         if (Configs.Generic.HUD_SHOW_CURRENT_BOX.getBooleanValue())
         {
-            this.addCurrentBox(lines, session, plan);
+            this.addCurrentBox(elements, session, plan);
         }
 
         if (Configs.Generic.HUD_MAX_LINES.getIntegerValue() > 0)
         {
-            this.addReminders(lines, project);
+            this.addReminders(elements, project);
         }
 
         int width = 0;
         int height = 0;
 
-        for (Line line : lines)
+        for (Element element : elements)
         {
-            width = Math.max(width, line.width());
-            height += line.height();
+            width = Math.max(width, element.width());
+            height += element.height();
         }
 
+        int totalWidth = width + PADDING * 2 + 2;
+        int totalHeight = height + PADDING * 2 - 2;
         int x = Configs.Generic.HUD_X.getIntegerValue();
         int y = Configs.Generic.HUD_Y.getIntegerValue();
 
         // Keep the HUD on the screen when the window gets smaller
-        x = Math.max(0, Math.min(x, ctx.guiWidth() - width - PADDING * 2));
-        y = Math.max(0, Math.min(y, ctx.guiHeight() - height - PADDING * 2));
+        x = Math.max(0, Math.min(x, ctx.guiWidth() - totalWidth));
+        y = Math.max(0, Math.min(y, ctx.guiHeight() - totalHeight));
 
-        RenderUtils.drawRect(ctx, x, y, width + PADDING * 2, height + PADDING * 2 - 2, 0xA0000000);
-        RenderUtils.drawRect(ctx, x, y, 2, height + PADDING * 2 - 2, 0xFFA060E0);
+        this.lastX = x;
+        this.lastY = y;
+        this.lastWidth = totalWidth;
+        this.lastHeight = totalHeight;
+
+        RenderUtils.drawRect(ctx, x, y, totalWidth, totalHeight, 0xA8000000);
+        RenderUtils.drawRect(ctx, x, y, 2, totalHeight, 0xFFA060E0);
 
         int ly = y + PADDING;
 
-        for (Line line : lines)
+        for (Element element : elements)
         {
-            line.draw(ctx, x + PADDING + 1, ly);
-            ly += line.height();
+            element.draw(ctx, x + PADDING + 2, ly);
+            ly += element.height();
         }
+
+        return true;
     }
 
-    private void addProgress(List<Line> lines, PlannerProject project, PlannerSession session, ShulkerPlan plan)
+    public int getLastX()
+    {
+        return this.lastX;
+    }
+
+    public int getLastY()
+    {
+        return this.lastY;
+    }
+
+    public int getLastWidth()
+    {
+        return this.lastWidth;
+    }
+
+    public int getLastHeight()
+    {
+        return this.lastHeight;
+    }
+
+    private void addProgress(List<Element> elements, PlannerProject project, PlannerSession session, ShulkerPlan plan)
     {
         int ready = session.getReadyBoxCount();
         int count = plan.getBoxCount();
@@ -138,86 +191,109 @@ public class HudRenderer implements IRenderer
 
         String c1 = ready >= count ? GuiBase.TXT_GREEN : GuiBase.TXT_YELLOW;
         String c2 = gathered >= included ? GuiBase.TXT_GREEN : GuiBase.TXT_YELLOW;
-        lines.add(Line.text(GuiBase.TXT_GRAY + StringUtils.translate("shulkerplanner.hud.progress",
-                                                                     c1 + ready + "/" + count + GuiBase.TXT_GRAY,
-                                                                     c2 + gathered + "/" + included + GuiBase.TXT_GRAY)));
+        elements.add(Line.text(GuiBase.TXT_GRAY + StringUtils.translate("shulkerplanner.hud.progress",
+                                                                        c1 + ready + "/" + count + GuiBase.TXT_GRAY,
+                                                                        c2 + gathered + "/" + included + GuiBase.TXT_GRAY)));
     }
 
-    private void addCurrentBox(List<Line> lines, PlannerSession session, ShulkerPlan plan)
+    private void addCurrentBox(List<Element> elements, PlannerSession session, ShulkerPlan plan)
     {
         if (plan.getBoxes().isEmpty())
         {
             return;
         }
 
-        PlannedBox box = session.getCurrentBox();
+        BoxProgress progress = session.getCurrentProgress();
 
-        if (box == null)
+        if (progress == null)
         {
-            lines.add(Line.text(GuiBase.TXT_GREEN + StringUtils.translate("shulkerplanner.hud.all_boxes_ready")));
+            elements.add(Line.text(GuiBase.TXT_GREEN + StringUtils.translate("shulkerplanner.hud.all_boxes_ready")));
             return;
         }
 
+        PlannedBox box = progress.getBox();
+        HudBoxView view = Configs.Generic.getHudBoxView();
+        HudCountFormat format = Configs.Generic.getHudCountFormat();
         String type = box.isPure() ? StringUtils.translate("shulkerplanner.gui.label.box.pure")
                                    : StringUtils.translate("shulkerplanner.gui.label.box.mixed", box.getTotals().size());
-        lines.add(Line.text(GuiBase.TXT_AQUA + StringUtils.translate("shulkerplanner.hud.current_box", box.getIndex(), plan.getBoxCount())
-                            + GuiBase.TXT_GRAY + "  " + type));
+        String status = progress.isContentsKnown() ? GuiBase.TXT_GREEN + "  ● " + StringUtils.translate("shulkerplanner.hud.live") : "";
 
-        int maxLines = Configs.Generic.HUD_MAX_BOX_LINES.getIntegerValue();
-        int shown = 0;
-        int missingTypes = 0;
-        int missingItems = 0;
+        elements.add(Line.text(GuiBase.TXT_AQUA + StringUtils.translate("shulkerplanner.hud.current_box", box.getIndex(), plan.getBoxCount())
+                               + GuiBase.TXT_GRAY + "  " + type + status));
 
-        // Items still missing first, then the ones that are already there
-        List<Map.Entry<String, Integer>> entries = new ArrayList<>(box.getTotals().entrySet());
-        entries.sort((a, b) -> Boolean.compare(session.getLoose(a.getKey()) >= a.getValue(), session.getLoose(b.getKey()) >= b.getValue()));
+        // Totals: in the box / in the inventory / still missing
+        elements.add(Line.text(StringUtils.translate("shulkerplanner.hud.box_totals",
+                                                     GuiBase.TXT_GREEN + Format.number(progress.getInBox()) + "/" + Format.number(progress.getTotal()) + GuiBase.TXT_GRAY,
+                                                     GuiBase.TXT_AQUA + Format.number(progress.getInInventory()) + GuiBase.TXT_GRAY,
+                                                     (progress.getMissing() > 0 ? GuiBase.TXT_RED : GuiBase.TXT_GREEN) + Format.number(progress.getMissing()) + GuiBase.TXT_GRAY)));
 
-        for (Map.Entry<String, Integer> e : entries)
+        if (view.showGrid())
         {
-            int need = e.getValue();
-            int have = Math.min(need, session.getLoose(e.getKey()));
-
-            if (have < need)
-            {
-                ++missingTypes;
-                missingItems += need - have;
-            }
-
-            if (shown >= maxLines)
-            {
-                continue;
-            }
-
-            ItemRequirement req = box.getItems().get(e.getKey());
-            String color = have >= need ? GuiBase.TXT_GREEN : (have > 0 ? GuiBase.TXT_YELLOW : GuiBase.TXT_RED);
-            String text = color + Format.number(have) + GuiBase.TXT_GRAY + "/" + Format.number(need) + " " + GuiBase.TXT_WHITE
-                          + Format.trim(req.proto().getHoverName().getString(), 120);
-
-            if (have < need)
-            {
-                text += GuiBase.TXT_GRAY + "  -" + Format.stacks(need - have, req.maxStack());
-            }
-
-            lines.add(Line.item(req.proto(), text));
-            ++shown;
+            elements.add(new Grid(progress));
+            elements.add(Line.text(GuiBase.TXT_GREEN + "■" + GuiBase.TXT_GRAY + StringUtils.translate("shulkerplanner.hud.legend.in_box") + "  "
+                                   + GuiBase.TXT_AQUA + "■" + GuiBase.TXT_GRAY + StringUtils.translate("shulkerplanner.hud.legend.in_inventory") + "  "
+                                   + GuiBase.TXT_GOLD + "■" + GuiBase.TXT_GRAY + StringUtils.translate("shulkerplanner.hud.legend.partial") + "  "
+                                   + GuiBase.TXT_RED + "■" + GuiBase.TXT_GRAY + StringUtils.translate("shulkerplanner.hud.legend.missing")));
         }
 
-        if (entries.size() > shown)
+        if (view.showList())
         {
-            lines.add(Line.text(GuiBase.TXT_GRAY + "  " + StringUtils.translate("shulkerplanner.gui.label.box.more", entries.size() - shown)));
+            int maxLines = Configs.Generic.HUD_MAX_BOX_LINES.getIntegerValue();
+            int shown = 0;
+
+            for (BoxProgress.Item item : progress.getItems())
+            {
+                if (shown >= maxLines)
+                {
+                    break;
+                }
+
+                elements.add(Line.item(item.item().proto(), this.formatItem(item, format)));
+                ++shown;
+            }
+
+            if (progress.getItems().size() > shown)
+            {
+                elements.add(Line.text(GuiBase.TXT_GRAY + "  " + StringUtils.translate("shulkerplanner.gui.label.box.more", progress.getItems().size() - shown)));
+            }
         }
 
-        if (missingTypes == 0)
+        for (Map.Entry<String, Integer> e : progress.getExtra().entrySet())
         {
-            lines.add(Line.text(GuiBase.TXT_GREEN + StringUtils.translate("shulkerplanner.hud.box_items_ready")));
+            ItemStack stack = new MaterialRow(e.getKey(), 0, 0).getStack();
+            elements.add(Line.item(stack, GuiBase.TXT_RED + StringUtils.translate("shulkerplanner.hud.remove", Format.number(e.getValue()), stack.getHoverName().getString())));
         }
-        else
+
+        if (progress.getMissing() == 0 && progress.getInBox() < progress.getTotal())
         {
-            lines.add(Line.text(GuiBase.TXT_GOLD + StringUtils.translate("shulkerplanner.hud.box_items_missing", Format.number(missingItems), missingTypes)));
+            elements.add(Line.text(GuiBase.TXT_GREEN + StringUtils.translate("shulkerplanner.hud.box_items_ready")));
+        }
+        else if (progress.getMissing() > 0)
+        {
+            elements.add(Line.text(GuiBase.TXT_GOLD + StringUtils.translate("shulkerplanner.hud.box_items_missing",
+                                                                            Format.number(progress.getMissing()), progress.getMissingTypes())));
         }
     }
 
-    private void addReminders(List<Line> lines, PlannerProject project)
+    private String formatItem(BoxProgress.Item item, HudCountFormat format)
+    {
+        int maxStack = item.item().maxStack();
+        String name = Format.trim(item.item().proto().getHoverName().getString(), 110);
+
+        return switch (item.state())
+        {
+            case IN_BOX -> GuiBase.TXT_GREEN + "✔ " + name;
+            case IN_INVENTORY -> GuiBase.TXT_AQUA + name + GuiBase.TXT_GRAY + "  "
+                                 + StringUtils.translate("shulkerplanner.hud.put_in", GuiBase.TXT_AQUA + format.format(item.toPutIn(), maxStack));
+            case PARTIAL -> GuiBase.TXT_YELLOW + name + GuiBase.TXT_GRAY + "  "
+                            + StringUtils.translate("shulkerplanner.hud.missing_have", GuiBase.TXT_RED + format.format(item.missing(), maxStack) + GuiBase.TXT_GRAY,
+                                                    GuiBase.TXT_AQUA + format.format(item.inBox() + item.inInventory(), maxStack));
+            case MISSING -> GuiBase.TXT_RED + name + GuiBase.TXT_GRAY + "  "
+                            + StringUtils.translate("shulkerplanner.hud.missing", GuiBase.TXT_RED + format.format(item.missing(), maxStack));
+        };
+    }
+
+    private void addReminders(List<Element> elements, PlannerProject project)
     {
         int max = Configs.Generic.HUD_MAX_LINES.getIntegerValue();
         List<Reminder> open = new ArrayList<>();
@@ -234,26 +310,56 @@ public class HudRenderer implements IRenderer
         {
             if (project.getReminders().isEmpty() == false)
             {
-                lines.add(Line.text(GuiBase.TXT_GREEN + StringUtils.translate("shulkerplanner.hud.all_done")));
+                elements.add(Line.text(GuiBase.TXT_GREEN + StringUtils.translate("shulkerplanner.hud.all_done")));
             }
 
             return;
         }
 
-        lines.add(Line.text(GuiBase.TXT_YELLOW + StringUtils.translate("shulkerplanner.hud.reminders", open.size())));
+        elements.add(Line.text(GuiBase.TXT_YELLOW + StringUtils.translate("shulkerplanner.hud.reminders", open.size())));
 
         for (int i = 0; i < open.size() && i < max; ++i)
         {
-            lines.add(Line.text(GuiBase.TXT_WHITE + " ○ " + Format.trim(open.get(i).getText(), MAX_TEXT_WIDTH - 12)));
+            Reminder reminder = open.get(i);
+            String text = GuiBase.TXT_WHITE + " ○ " + Format.trim(reminder.getText(), MAX_TEXT_WIDTH - 12);
+
+            if (reminder.getItemId() != null)
+            {
+                elements.add(Line.item(new MaterialRow(reminder.getItemId(), 0, 0).getStack(), text));
+            }
+            else
+            {
+                elements.add(Line.text(text));
+            }
         }
 
         if (open.size() > max)
         {
-            lines.add(Line.text(GuiBase.TXT_GRAY + "   " + StringUtils.translate("shulkerplanner.hud.more", open.size() - max)));
+            elements.add(Line.text(GuiBase.TXT_GRAY + "   " + StringUtils.translate("shulkerplanner.hud.more", open.size() - max)));
         }
     }
 
-    private record Line(@Nullable ItemStack icon, String text)
+    public static int getStateColor(BoxProgress.State state)
+    {
+        return switch (state)
+        {
+            case IN_BOX -> COLOR_IN_BOX;
+            case IN_INVENTORY -> COLOR_IN_INVENTORY;
+            case PARTIAL -> COLOR_PARTIAL;
+            case MISSING -> COLOR_MISSING;
+        };
+    }
+
+    private interface Element
+    {
+        int width();
+
+        int height();
+
+        void draw(GuiContext ctx, int x, int y);
+    }
+
+    private record Line(@Nullable ItemStack icon, String text) implements Element
     {
         static Line text(String text)
         {
@@ -265,17 +371,20 @@ public class HudRenderer implements IRenderer
             return new Line(icon, text);
         }
 
-        int width()
+        @Override
+        public int width()
         {
             return StringUtils.getStringWidth(this.text) + (this.icon != null ? 18 : 0);
         }
 
-        int height()
+        @Override
+        public int height()
         {
             return this.icon != null ? ITEM_LINE : TEXT_LINE;
         }
 
-        void draw(GuiContext ctx, int x, int y)
+        @Override
+        public void draw(GuiContext ctx, int x, int y)
         {
             if (this.icon != null)
             {
@@ -285,6 +394,61 @@ public class HudRenderer implements IRenderer
             else
             {
                 ctx.drawString(ctx.fontRenderer(), this.text, x, y, 0xFFFFFFFF, true);
+            }
+        }
+    }
+
+    /**
+     * The box drawn like the vanilla shulker box screen, every slot tinted by its state
+     */
+    private record Grid(BoxProgress progress) implements Element
+    {
+        @Override
+        public int width()
+        {
+            return GRID_WIDTH;
+        }
+
+        @Override
+        public int height()
+        {
+            return GRID_HEIGHT + 3;
+        }
+
+        @Override
+        public void draw(GuiContext ctx, int x, int y)
+        {
+            // Vanilla style panel
+            RenderUtils.drawRect(ctx, x, y + 1, GRID_WIDTH, GRID_HEIGHT, 0xFFC6C6C6);
+            RenderUtils.drawRect(ctx, x, y + 1, GRID_WIDTH, 1, 0xFFFFFFFF);
+            RenderUtils.drawRect(ctx, x, y + 1, 1, GRID_HEIGHT, 0xFFFFFFFF);
+            RenderUtils.drawRect(ctx, x, y + GRID_HEIGHT, GRID_WIDTH, 1, 0xFF555555);
+            RenderUtils.drawRect(ctx, x + GRID_WIDTH - 1, y + 1, 1, GRID_HEIGHT, 0xFF555555);
+
+            List<BoxProgress.Slot> slots = this.progress.getSlots();
+
+            for (int i = 0; i < PlannedBox.SLOTS; ++i)
+            {
+                int sx = x + 4 + (i % 9) * SLOT;
+                int sy = y + 5 + (i / 9) * SLOT;
+
+                // Slot frame: dark top/left, white bottom/right, like the vanilla slots
+                RenderUtils.drawRect(ctx, sx, sy, SLOT, SLOT, 0xFF8B8B8B);
+                RenderUtils.drawRect(ctx, sx, sy, SLOT - 1, 1, 0xFF373737);
+                RenderUtils.drawRect(ctx, sx, sy, 1, SLOT - 1, 0xFF373737);
+                RenderUtils.drawRect(ctx, sx + 1, sy + SLOT - 1, SLOT - 1, 1, 0xFFFFFFFF);
+                RenderUtils.drawRect(ctx, sx + SLOT - 1, sy + 1, 1, SLOT - 1, 0xFFFFFFFF);
+
+                if (i < slots.size())
+                {
+                    BoxProgress.Slot slot = slots.get(i);
+                    int color = getStateColor(slot.state());
+                    RenderUtils.drawRect(ctx, sx + 1, sy + 1, SLOT - 2, SLOT - 2, (color & 0x00FFFFFF) | 0xC0000000);
+
+                    ItemStack stack = slot.stack().createStack();
+                    ctx.renderItem(stack, sx + 1, sy + 1);
+                    ctx.renderItemDecorations(ctx.fontRenderer(), stack, sx + 1, sy + 1);
+                }
             }
         }
     }

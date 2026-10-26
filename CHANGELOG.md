@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.1.0 - Minecraft 26.3
+
+- The HUD shows the box you're filling as a real shulker box interface (9x3), each slot colored by state:
+  inside, in your inventory ready to put in, partially there, missing.
+- Three HUD views: Shulker box, Compact (only what's missing) and both. Amounts can be shown as stacks or as plain numbers.
+- The HUD tracks the contents of the box live while it's open, keeps them after closing it,
+  and also recognizes a partially filled box carried in the inventory.
+- Inventory changes are reflected on the HUD every tick.
+- The HUD can be dragged anywhere with the mouse (Move HUD button or `M + J`). The view and counts can be switched from the same screen.
+- The HUD title is the name of the schematic.
+- The HUD follows the placement selected in Litematica when it already has a saved project.
+- New hotkeys: move the HUD, cycle the HUD view.
+
 ## 1.0.0 - Minecraft 26.3
 
 First release.
