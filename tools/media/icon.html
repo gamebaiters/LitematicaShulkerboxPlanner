@@ -1,0 +1,154 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; padding: 0; background: transparent; }
+  body { width: 512px; height: 512px; overflow: hidden; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="c" width="512" height="512"></canvas>
+<script>
+const c = document.getElementById('c');
+const g = c.getContext('2d');
+const S = 512;
+
+// Background: deep purple tile with a soft glow
+const bg = g.createRadialGradient(S * 0.35, S * 0.25, 20, S * 0.5, S * 0.5, S * 0.75);
+bg.addColorStop(0, '#4a2a78');
+bg.addColorStop(0.55, '#24143d');
+bg.addColorStop(1, '#130b21');
+g.fillStyle = bg;
+g.fillRect(0, 0, S, S);
+
+// Subtle grid
+g.strokeStyle = 'rgba(255,255,255,0.04)';
+g.lineWidth = 1;
+for (let i = 0; i <= S; i += 32) {
+  g.beginPath(); g.moveTo(i + 0.5, 0); g.lineTo(i + 0.5, S); g.stroke();
+  g.beginPath(); g.moveTo(0, i + 0.5); g.lineTo(S, i + 0.5); g.stroke();
+}
+
+// Pixel art shulker box, 20x20 grid
+const P = {
+  '.': null,
+  'k': '#1d0f2b',   // outline
+  'L': '#d7a6f0',   // lid highlight
+  'l': '#b884d6',   // lid light
+  'm': '#9a63bd',   // lid mid
+  'n': '#7a4a9c',   // lid shadow
+  's': '#3a1f52',   // seam
+  'b': '#8a55ad',   // body light
+  'd': '#6b3e8a',   // body
+  'e': '#55306f',   // body shadow
+  'y': '#f4d36b',   // latch
+  'Y': '#c9a23e',   // latch shadow
+};
+const ART = [
+  "....................",
+  "..kkkkkkkkkkkkkkkk..",
+  ".kLLLLLLLLLLLLLLLlk.",
+  ".kLllllllllllllllmk.",
+  ".klllllllllllllllmk.",
+  ".kllmmmmmmmmmmmmmnk.",
+  ".kmmmmmmmmmmmmmmmnk.",
+  ".knnnnnnnyynnnnnnnk.",
+  ".ksssssssyYsssssssk.",
+  ".kbbbbbbbYYbbbbbbek.",
+  ".kbbdddddddddddddek.",
+  ".kbddddddddddddddek.",
+  ".kbddddddddddddddek.",
+  ".kbddddddddddddddek.",
+  ".kbddddddddddddddek.",
+  ".kbddddddddddddddek.",
+  ".keeeeeeeeeeeeeeeek.",
+  ".keeeeeeeeeeeeeeeek.",
+  "..kkkkkkkkkkkkkkkk..",
+  "....................",
+];
+const px = 17;               // size of one pixel
+const ox = 52, oy = 70;      // art offset
+
+// Drop shadow
+g.save();
+g.shadowColor = 'rgba(160, 96, 224, 0.55)';
+g.shadowBlur = 60;
+g.shadowOffsetY = 18;
+g.fillStyle = '#1d0f2b';
+g.fillRect(ox + px * 1, oy + px * 2, px * 18, px * 17);
+g.restore();
+
+for (let y = 0; y < ART.length; y++) {
+  for (let x = 0; x < ART[y].length; x++) {
+    const col = P[ART[y][x]];
+    if (col) { g.fillStyle = col; g.fillRect(ox + x * px, oy + y * px, px, px); }
+  }
+}
+
+// Planner badge: a little checklist sheet, bottom right
+const bx = 300, by = 286, bw = 168, bh = 190;
+g.save();
+g.shadowColor = 'rgba(0,0,0,0.55)';
+g.shadowBlur = 30;
+g.shadowOffsetY = 10;
+roundRect(bx, by, bw, bh, 22);
+g.fillStyle = '#f6f2fb';
+g.fill();
+g.restore();
+roundRect(bx, by, bw, bh, 22);
+g.lineWidth = 8;
+g.strokeStyle = '#1d0f2b';
+g.stroke();
+
+// Clip at the top of the sheet
+roundRect(bx + 54, by - 18, 60, 30, 10);
+g.fillStyle = '#a060e0';
+g.fill();
+g.lineWidth = 6;
+g.strokeStyle = '#1d0f2b';
+g.stroke();
+
+const rows = [
+  { y: by + 52, done: true },
+  { y: by + 102, done: true },
+  { y: by + 152, done: false },
+];
+for (const r of rows) {
+  // checkbox
+  roundRect(bx + 22, r.y - 17, 34, 34, 8);
+  g.fillStyle = r.done ? '#3cbf5a' : '#ffffff';
+  g.fill();
+  g.lineWidth = 5;
+  g.strokeStyle = r.done ? '#1f7a35' : '#b9a9cc';
+  g.stroke();
+  if (r.done) {
+    g.beginPath();
+    g.moveTo(bx + 30, r.y);
+    g.lineTo(bx + 37, r.y + 8);
+    g.lineTo(bx + 49, r.y - 8);
+    g.lineWidth = 6;
+    g.lineCap = 'round';
+    g.lineJoin = 'round';
+    g.strokeStyle = '#ffffff';
+    g.stroke();
+  }
+  // line
+  roundRect(bx + 68, r.y - 6, r.done ? 78 : 62, 12, 6);
+  g.fillStyle = r.done ? '#cdbfe0' : '#8e6bb4';
+  g.fill();
+}
+
+function roundRect(x, y, w, h, r) {
+  g.beginPath();
+  g.moveTo(x + r, y);
+  g.arcTo(x + w, y, x + w, y + h, r);
+  g.arcTo(x + w, y + h, x, y + h, r);
+  g.arcTo(x, y + h, x, y, r);
+  g.arcTo(x, y, x + w, y, r);
+  g.closePath();
+}
+</script>
+</body>
+</html>

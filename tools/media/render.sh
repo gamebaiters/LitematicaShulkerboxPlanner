@@ -26,7 +26,6 @@ cp "$(pick 09_litematica_main_menu)"     "$OUT/screenshots/main-menu.png"
 cp "$(pick 10_config)"                   "$OUT/screenshots/config.png"
 
 # Inputs for the html templates
-cp "$OUT/icon.png"                             "$MEDIA/icon.png"
 cp "$OUT/screenshots/shulker-boxes.png"        "$MEDIA/shot_a.png"
 cp "$OUT/screenshots/packing-assistant.png"    "$MEDIA/shot_b.png"
 cp "$OUT/screenshots/packing-assistant.png"    "$MEDIA/shot_c.png"
@@ -40,6 +39,15 @@ render() {
             --screenshot="$(cygpath -w "$png")" "file:///$(cygpath -m "$html")" >/dev/null 2>&1
     echo "rendered $png"
 }
+
+# Icons: 512 px for Modrinth / docs, 128 px inside the mod jar
+render "$MEDIA/icon.html" "$OUT/icon.png" "512,512"
+"$EDGE" --headless=new --disable-gpu --hide-scrollbars --force-device-scale-factor=0.25 \
+        --virtual-time-budget=3000 --window-size=512,512 \
+        --screenshot="$(cygpath -w "$ROOT/src/main/resources/assets/shulkerplanner/icon.png")" \
+        "file:///$(cygpath -m "$MEDIA/icon.html")" >/dev/null 2>&1
+echo "rendered mod icon (128 px)"
+cp "$OUT/icon.png" "$MEDIA/icon.png"
 
 render "$MEDIA/banner.html"   "$OUT/banner.png"   "1600,500"
 render "$MEDIA/features.html" "$OUT/features.png" "1920,1080"
