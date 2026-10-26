@@ -1,0 +1,25 @@
+# Gradle
+.gradle/
+build/
+out/
+
+# IDEs
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.classpath
+.project
+.settings/
+bin/
+
+# Local toolchain and notes
+.tools/
+env.sh
+private/
+run/
+
+# Rendered intermediate files
+tools/media/shot_*.png
+tools/media/icon.png

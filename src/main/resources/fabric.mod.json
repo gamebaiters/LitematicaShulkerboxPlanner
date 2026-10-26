@@ -1,0 +1,29 @@
+{
+	"schemaVersion": 1,
+	"id": "shulkerplanner",
+	"version": "${version}",
+	"name": "Litematica Shulker Planner",
+	"description": "Litematica addon that turns a material list into a ready-to-fill shulker box plan, with a packing assistant, an in-game HUD and a to-do list.",
+	"authors": ["MarcoTech81"],
+	"contributors": ["GameBaitersCrew"],
+	"contact": {
+		"homepage": "https://github.com/gamebaiters/LitematicaShulkerboxPlanner",
+		"sources": "https://github.com/gamebaiters/LitematicaShulkerboxPlanner",
+		"issues": "https://github.com/gamebaiters/LitematicaShulkerboxPlanner/issues"
+	},
+	"license": "LGPL-3.0",
+	"icon": "assets/shulkerplanner/icon.png",
+	"environment": "client",
+	"entrypoints": {
+		"client": ["it.marco.shulkerplanner.ShulkerPlanner"],
+		"modmenu": ["it.marco.shulkerplanner.compat.ModMenuImpl"]
+	},
+	"mixins": ["shulkerplanner.mixins.json"],
+	"depends": {
+		"fabricloader": ">=0.19.0",
+		"minecraft": ">=26.3 <26.4",
+		"java": ">=25",
+		"malilib": ">=0.30.2-",
+		"litematica": ">=0.29.1-"
+	}
+}
