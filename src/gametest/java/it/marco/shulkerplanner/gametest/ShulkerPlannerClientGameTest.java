@@ -46,9 +46,13 @@ import it.marco.shulkerplanner.data.PlannerProject;
 import it.marco.shulkerplanner.data.PlannerSession;
 import it.marco.shulkerplanner.data.ProjectStorage;
 import it.marco.shulkerplanner.data.Reminder;
-import it.marco.shulkerplanner.config.HudBoxView;
 import it.marco.shulkerplanner.config.HudCountFormat;
 import it.marco.shulkerplanner.gui.GuiHudEditor;
+import it.marco.shulkerplanner.hud.HudColor;
+import it.marco.shulkerplanner.hud.HudElement;
+import it.marco.shulkerplanner.hud.HudPreset;
+import it.marco.shulkerplanner.hud.HudStyle;
+import it.marco.shulkerplanner.hud.HudTheme;
 import it.marco.shulkerplanner.gui.GuiPlannerConfigs;
 import it.marco.shulkerplanner.gui.PlannerGuis;
 import it.marco.shulkerplanner.gui.PlannerTab;
@@ -291,11 +295,15 @@ public class ShulkerPlannerClientGameTest implements FabricClientGameTest
         log("Partial box in the inventory: box #%d, inside=%d, loose=%d, known=%d", carried[0], carried[1], carried[2], carried[3]);
         check(carried[0] == 3 && carried[1] == 640 && carried[2] == 100 && carried[3] == 1, "the partially filled box in the inventory is not shown");
 
-        // --- The HUD can be dragged in the editor
+        // --- HUD editor: drag, resize with the corner and the mouse wheel, compact mode, elements, per-project style
         ctx.runOnClient(mc -> {
             Configs.Generic.HUD_ENABLED.setBooleanValue(true);
-            Configs.Generic.HUD_X.setIntegerValue(4);
-            Configs.Generic.HUD_Y.setIntegerValue(40);
+            HudStyle style = PlannerSession.INSTANCE.getHudStyle();
+            style.applyTheme(HudTheme.PURPLE);
+            style.applyPreset(HudPreset.FULL);
+            style.setScale(1.0f);
+            style.setCompact(false);
+            style.setPosition(4, 40);
             mc.gui.setScreen(new GuiHudEditor(null));
         });
         ctx.waitTicks(5);
@@ -305,17 +313,80 @@ public class ShulkerPlannerClientGameTest implements FabricClientGameTest
             HudRenderer hud = HudRenderer.INSTANCE;
             int x = hud.getLastX() + 10;
             int y = hud.getLastY() + 10;
-            editor.mouseClicked(new MouseButtonEvent(x, y, new MouseButtonInfo(ScanCodes.OFFSET_MOUSE_LEFT, 0)), false);
-            editor.mouseDragged(new MouseButtonEvent(x + 120, y + 30, new MouseButtonInfo(ScanCodes.OFFSET_MOUSE_LEFT, 0)), 120, 30);
-            editor.mouseReleased(new MouseButtonEvent(x + 120, y + 30, new MouseButtonInfo(ScanCodes.OFFSET_MOUSE_LEFT, 0)));
-            return new int[] { Configs.Generic.HUD_X.getIntegerValue(), Configs.Generic.HUD_Y.getIntegerValue() };
+            editor.mouseClicked(click(x, y), false);
+            editor.mouseDragged(click(x + 120, y + 30), 120, 30);
+            editor.mouseReleased(click(x + 120, y + 30));
+            HudStyle style = PlannerSession.INSTANCE.getHudStyle();
+            return new int[] { style.getX(), style.getY() };
         });
         log("HUD dragged to %d, %d", moved[0], moved[1]);
         check(moved[0] == 124 && moved[1] == 70, "dragging the HUD did not move it");
+        ctx.waitTicks(3);
+
+        float[] resized = ctx.computeOnClient(mc -> {
+            GuiHudEditor editor = (GuiHudEditor) mc.gui.screen();
+            HudRenderer hud = HudRenderer.INSTANCE;
+            int width = hud.getLastWidth();
+            int hx = hud.getLastX() + hud.getLastWidth() - 2;
+            int hy = hud.getLastY() + hud.getLastHeight() - 2;
+            // Drag the corner to make the HUD half as wide
+            editor.mouseClicked(click(hx, hy), false);
+            editor.mouseDragged(click(hx - width / 2, hy), -width / 2.0, 0);
+            editor.mouseReleased(click(hx - width / 2, hy));
+            float afterHandle = PlannerSession.INSTANCE.getHudStyle().getScale();
+            // Two notches of the mouse wheel over the HUD
+            editor.mouseScrolled(hud.getLastX() + 5, hud.getLastY() + 5, 0, 1);
+            editor.mouseScrolled(hud.getLastX() + 5, hud.getLastY() + 5, 0, 1);
+            return new float[] { afterHandle, PlannerSession.INSTANCE.getHudStyle().getScale() };
+        });
+        log("HUD scale after dragging the corner: %.2f, after two wheel notches: %.2f", resized[0], resized[1]);
+        check(Math.abs(resized[0] - 0.5f) < 0.06f, "resizing with the corner handle did not work");
+        check(Math.abs(resized[1] - 0.6f) < 0.06f, "resizing with the mouse wheel did not work");
+        ctx.waitTicks(3);
+
+        ctx.runOnClient(mc -> PlannerSession.INSTANCE.getHudStyle().setScale(1.0f));
+        ctx.waitTicks(3);
+        int normal = ctx.computeOnClient(mc -> HudRenderer.INSTANCE.getLastHeight());
+        ctx.runOnClient(mc -> PlannerSession.INSTANCE.getHudStyle().setCompact(true));
+        ctx.waitTicks(3);
+        int compact = ctx.computeOnClient(mc -> HudRenderer.INSTANCE.getLastHeight());
         ctx.runOnClient(mc -> {
-            Configs.Generic.HUD_X.setIntegerValue(4);
-            Configs.Generic.HUD_Y.setIntegerValue(40);
+            HudStyle style = PlannerSession.INSTANCE.getHudStyle();
+            style.setCompact(false);
+            style.setShown(HudElement.BOX_GRID, false);
+        });
+        ctx.waitTicks(3);
+        int noGrid = ctx.computeOnClient(mc -> HudRenderer.INSTANCE.getLastHeight());
+        log("HUD height: normal %d, compact %d, without the box grid %d", normal, compact, noGrid);
+        check(compact < normal * 0.8, "the compact mode is not more compact");
+        check(noGrid < normal - 50, "hiding the box grid did not remove it");
+
+        // Every project keeps its own style, and it is saved with the project
+        String[] titles = ctx.computeOnClient(mc -> {
+            HudStyle style = PlannerSession.INSTANCE.getHudStyle();
+            style.setShown(HudElement.BOX_GRID, true);
+            style.setTitle("Il mio castello");
+            style.applyTheme(HudTheme.OCEAN);
+            style.setColor(HudColor.TITLE, 0xFF123456);
+            PlannerSession.INSTANCE.save();
+            String name = PlannerSession.INSTANCE.getProject().getName();
+            PlannerProject reloaded = ProjectStorage.load(name);
+            HudStyle loaded = reloaded.getHudStyle();
+            return new String[] { PlannerSession.INSTANCE.getDisplayName(), loaded.getTitle(), loaded.getTheme().getName(),
+                                  String.format("%08X", loaded.getColor(HudColor.TITLE)), String.valueOf(loaded.getX()) };
+        });
+        log("Custom title shown: '%s', saved title '%s', theme %s, title color %s, x %s", titles[0], titles[1], titles[2], titles[3], titles[4]);
+        check(titles[0].equals("Il mio castello") && titles[1].equals("Il mio castello"), "the custom HUD title was not applied or saved");
+        check(titles[2].equals("custom") && titles[3].equals("FF123456"), "the custom colors were not saved");
+        shot(ctx, "check_hud_editor_custom");
+
+        ctx.runOnClient(mc -> {
+            HudStyle style = PlannerSession.INSTANCE.getHudStyle();
+            style.setTitle("");
+            style.applyTheme(HudTheme.PURPLE);
+            style.setPosition(4, 40);
             Configs.Generic.HUD_ENABLED.setBooleanValue(false);
+            PlannerSession.INSTANCE.save();
             mc.gui.setScreen(null);
         });
         sp.getServer().runCommand("clear @a");
@@ -654,30 +725,65 @@ public class ShulkerPlannerClientGameTest implements FabricClientGameTest
         shot(ctx, "08_packing_assistant");
         ctx.runOnClient(mc -> mc.player.closeContainer());
 
-        // The HUD keeps showing the box just filled, in the three views
+        // The HUD keeps showing the box just filled: full view, then the other views, themes and the editor
         ctx.runOnClient(mc -> {
             Configs.Generic.HUD_ENABLED.setBooleanValue(true);
-            Configs.Generic.HUD_BOX_VIEW.setOptionListValue(HudBoxView.BOTH);
+            HudStyle style = PlannerSession.INSTANCE.getHudStyle();
+            style.applyPreset(HudPreset.FULL);
+            style.applyTheme(HudTheme.PURPLE);
+            style.setCompact(false);
+            style.setScale(1.0f);
+            style.setPosition(4, 40);
             mc.gui.setScreen(null);
         });
         ctx.waitTicks(25);
         shot(ctx, "06_hud");
 
-        ctx.runOnClient(mc -> Configs.Generic.HUD_BOX_VIEW.setOptionListValue(HudBoxView.SHULKER));
+        ctx.runOnClient(mc -> PlannerSession.INSTANCE.getHudStyle().applyPreset(HudPreset.SHULKER));
         shot(ctx, "06b_hud_shulker");
 
         ctx.runOnClient(mc -> {
-            Configs.Generic.HUD_BOX_VIEW.setOptionListValue(HudBoxView.COMPACT);
-            Configs.Generic.HUD_COUNT_FORMAT.setOptionListValue(HudCountFormat.ITEMS);
+            HudStyle style = PlannerSession.INSTANCE.getHudStyle();
+            style.applyPreset(HudPreset.LIST);
+            style.setCountFormat(HudCountFormat.ITEMS);
         });
         shot(ctx, "06c_hud_compact");
 
         ctx.runOnClient(mc -> {
-            Configs.Generic.HUD_BOX_VIEW.setOptionListValue(HudBoxView.BOTH);
-            Configs.Generic.HUD_COUNT_FORMAT.setOptionListValue(HudCountFormat.STACKS);
+            HudStyle style = PlannerSession.INSTANCE.getHudStyle();
+            style.applyPreset(HudPreset.FULL);
+            style.setCountFormat(HudCountFormat.STACKS);
+            style.setCompact(true);
+            style.applyTheme(HudTheme.OCEAN);
+            style.setTitle("Castello - magazzino nord");
+        });
+        shot(ctx, "06d_hud_compact_ocean");
+
+        ctx.runOnClient(mc -> {
+            HudStyle style = PlannerSession.INSTANCE.getHudStyle();
+            style.setCompact(false);
+            style.applyTheme(HudTheme.LIGHT);
+            style.setBorder(true);
+            style.setTextShadow(false);
+            style.setScale(0.75f);
+        });
+        shot(ctx, "06e_hud_light_small");
+
+        ctx.runOnClient(mc -> {
+            HudStyle style = PlannerSession.INSTANCE.getHudStyle();
+            style.applyTheme(HudTheme.PURPLE);
+            style.setBorder(false);
+            style.setTextShadow(true);
+            style.setScale(1.0f);
+            style.setTitle("");
             mc.gui.setScreen(new GuiHudEditor(null));
         });
         shot(ctx, "11_hud_editor");
+        ctx.runOnClient(mc -> clickVanillaButton(mc, "Elementi", "Elements"));
+        shot(ctx, "11b_hud_editor_elements");
+        ctx.runOnClient(mc -> clickVanillaButton(mc, "Layout", "Layout"));
+        shot(ctx, "11c_hud_editor_layout");
+        ctx.runOnClient(mc -> clickVanillaButton(mc, "Aspetto", "Look"));
         ctx.runOnClient(mc -> mc.gui.setScreen(null));
 
         ctx.runOnClient(mc -> GuiBase.openGui(new GuiMainMenu()));
@@ -711,6 +817,33 @@ public class ShulkerPlannerClientGameTest implements FabricClientGameTest
                 be.setItem(i, stacks.get(i).copy());
             }
         });
+    }
+
+    private static MouseButtonEvent click(double x, double y)
+    {
+        return new MouseButtonEvent(x, y, new MouseButtonInfo(ScanCodes.OFFSET_MOUSE_LEFT, 0));
+    }
+
+    private static void clickVanillaButton(Minecraft mc, String... labels)
+    {
+        for (var child : mc.gui.screen().children())
+        {
+            if (child instanceof net.minecraft.client.gui.components.Button button)
+            {
+                String text = button.getMessage().getString();
+
+                for (String label : labels)
+                {
+                    if (text.equals(label))
+                    {
+                        button.onPress(new net.minecraft.client.input.KeyEvent(ScanCodes.SCAN_RETURN, 0, 0));
+                        return;
+                    }
+                }
+            }
+        }
+
+        throw new AssertionError("Button not found: " + String.join("/", labels));
     }
 
     private static boolean isPlannerOpen(ClientGameTestContext ctx)

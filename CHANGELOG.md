@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.2.0 - Minecraft 26.3
+
+- Every schematic now has its own HUD style, saved with the project.
+- New HUD editor (`M + J` or *Customize HUD* in the planner), with three pages:
+  - **Look:** custom title (empty uses the schematic name), 7 themes, every color editable (hex or click the swatch to cycle a palette), background opacity.
+  - **Elements:** turn every part of the HUD on or off: title, progress, current box, box totals, 9x3 box view, color legend, missing items list, items to remove, status line, reminders. Quick views: Full, Shulker box, List only, Minimal, Reminders only.
+  - **Layout:** size from 50% to 250%, compact mode, padding, text shadow, side bar, border, how many items and reminders to show, stacks or plain numbers.
+- Resize the HUD by dragging its bottom right corner or with the mouse wheel over it.
+- *Use as style for new projects* saves the current style as the default for new schematics.
+- The old global HUD options are carried over to the default style on the first start.
+
 ## 1.1.1 - Minecraft 26.3
 
 - Fixed the planner always opening the same schematic. The `M + B` hotkey and the Litematica main menu button now use the placement selected in Litematica. Before, they used the first material list Litematica had remembered.

@@ -28,14 +28,6 @@ public class Configs implements IConfigHandler
     public static class Generic
     {
         public static final ConfigBoolean HUD_ENABLED               = new ConfigBoolean("hudEnabled",               true).apply(GENERIC_KEY);
-        public static final ConfigInteger HUD_X                     = new ConfigInteger("hudOffsetX",               4, 0, 4000).apply(GENERIC_KEY);
-        public static final ConfigInteger HUD_Y                     = new ConfigInteger("hudOffsetY",               40, 0, 4000).apply(GENERIC_KEY);
-        public static final ConfigInteger HUD_MAX_LINES             = new ConfigInteger("hudMaxReminders",          6, 0, 30).apply(GENERIC_KEY);
-        public static final ConfigBoolean HUD_SHOW_PROGRESS         = new ConfigBoolean("hudShowProgress",          true).apply(GENERIC_KEY);
-        public static final ConfigBoolean HUD_SHOW_CURRENT_BOX      = new ConfigBoolean("hudShowCurrentBox",        true).apply(GENERIC_KEY);
-        public static final ConfigInteger HUD_MAX_BOX_LINES         = new ConfigInteger("hudMaxBoxItems",           6, 1, 27).apply(GENERIC_KEY);
-        public static final ConfigOptionList HUD_BOX_VIEW           = new ConfigOptionList("hudBoxView",            HudBoxView.BOTH).apply(GENERIC_KEY);
-        public static final ConfigOptionList HUD_COUNT_FORMAT       = new ConfigOptionList("hudCountFormat",        HudCountFormat.STACKS).apply(GENERIC_KEY);
         public static final ConfigBoolean HUD_FOLLOW_PLACEMENT      = new ConfigBoolean("hudFollowSelectedPlacement", true).apply(GENERIC_KEY);
         public static final ConfigBoolean PACKING_ASSISTANT         = new ConfigBoolean("packingAssistant",         true).apply(GENERIC_KEY);
         public static final ConfigBoolean PACKING_HIGHLIGHT_SLOTS   = new ConfigBoolean("packingHighlightSlots",    true).apply(GENERIC_KEY);
@@ -44,26 +36,8 @@ public class Configs implements IConfigHandler
         public static final ConfigBoolean ADD_BUTTON_MAIN_MENU      = new ConfigBoolean("addButtonToMainMenu",      true).apply(GENERIC_KEY);
         public static final ConfigString  LAST_PROJECT              = new ConfigString("lastProject",               "").apply(GENERIC_KEY);
 
-        public static HudBoxView getHudBoxView()
-        {
-            return (HudBoxView) HUD_BOX_VIEW.getOptionListValue();
-        }
-
-        public static HudCountFormat getHudCountFormat()
-        {
-            return (HudCountFormat) HUD_COUNT_FORMAT.getOptionListValue();
-        }
-
         public static final ImmutableList<IConfigBase> OPTIONS = ImmutableList.of(
                 HUD_ENABLED,
-                HUD_X,
-                HUD_Y,
-                HUD_MAX_LINES,
-                HUD_SHOW_PROGRESS,
-                HUD_SHOW_CURRENT_BOX,
-                HUD_MAX_BOX_LINES,
-                HUD_BOX_VIEW,
-                HUD_COUNT_FORMAT,
                 HUD_FOLLOW_PLACEMENT,
                 PACKING_ASSISTANT,
                 PACKING_HIGHLIGHT_SLOTS,
@@ -74,6 +48,24 @@ public class Configs implements IConfigHandler
 
         // Internal values, saved but not shown in the config GUI
         public static final List<IConfigBase> INTERNAL = ImmutableList.of(LAST_PROJECT);
+    }
+
+    /**
+     * The old global HUD options. They are only read, to create the first default HUD style from them.
+     */
+    public static class Legacy
+    {
+        public static final ConfigInteger HUD_X                     = new ConfigInteger("hudOffsetX",               4, 0, 4000);
+        public static final ConfigInteger HUD_Y                     = new ConfigInteger("hudOffsetY",               40, 0, 4000);
+        public static final ConfigInteger HUD_MAX_LINES             = new ConfigInteger("hudMaxReminders",          6, 0, 30);
+        public static final ConfigBoolean HUD_SHOW_PROGRESS         = new ConfigBoolean("hudShowProgress",          true);
+        public static final ConfigBoolean HUD_SHOW_CURRENT_BOX      = new ConfigBoolean("hudShowCurrentBox",        true);
+        public static final ConfigInteger HUD_MAX_BOX_LINES         = new ConfigInteger("hudMaxBoxItems",           6, 1, 27);
+        public static final ConfigString  HUD_BOX_VIEW              = new ConfigString("hudBoxView",                "both");
+        public static final ConfigOptionList HUD_COUNT_FORMAT       = new ConfigOptionList("hudCountFormat",        HudCountFormat.STACKS);
+
+        public static final List<IConfigBase> OPTIONS = ImmutableList.of(HUD_X, HUD_Y, HUD_MAX_LINES, HUD_SHOW_PROGRESS,
+                                                                          HUD_SHOW_CURRENT_BOX, HUD_MAX_BOX_LINES, HUD_BOX_VIEW, HUD_COUNT_FORMAT);
     }
 
     public static void loadFromFile()
@@ -89,6 +81,7 @@ public class Configs implements IConfigHandler
                 JsonObject root = element.getAsJsonObject();
 
                 ConfigUtils.readConfigBase(root, "Generic", Generic.OPTIONS);
+                ConfigUtils.readConfigBase(root, "Generic", Legacy.OPTIONS);
                 ConfigUtils.readConfigBase(root, "Internal", Generic.INTERNAL);
                 ConfigUtils.readConfigBase(root, "Hotkeys", Hotkeys.HOTKEY_LIST);
             }

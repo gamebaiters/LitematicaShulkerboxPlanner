@@ -8,7 +8,9 @@ import fi.dy.masa.malilib.util.InfoUtils;
 
 import it.marco.shulkerplanner.config.Configs;
 import it.marco.shulkerplanner.config.Hotkeys;
-import it.marco.shulkerplanner.config.HudBoxView;
+import it.marco.shulkerplanner.data.PlannerSession;
+import it.marco.shulkerplanner.hud.HudPreset;
+import it.marco.shulkerplanner.hud.HudStyle;
 import it.marco.shulkerplanner.gui.GuiHudEditor;
 import it.marco.shulkerplanner.gui.GuiPlannerConfigs;
 import it.marco.shulkerplanner.gui.PlannerGuis;
@@ -55,9 +57,12 @@ public class KeyCallbacks
             }
             else if (key == Hotkeys.CYCLE_HUD_VIEW.getKeybind())
             {
-                HudBoxView view = Configs.Generic.getHudBoxView().cycle(true);
-                Configs.Generic.HUD_BOX_VIEW.setOptionListValue(view);
-                InfoUtils.printActionbarMessage("shulkerplanner.message.hud_view", view.getDisplayName());
+                HudStyle style = PlannerSession.INSTANCE.getHudStyle();
+                HudPreset current = HudPreset.match(style.getElements());
+                HudPreset next = current != null ? current.cycle(true) : HudPreset.FULL;
+                style.applyPreset(next);
+                PlannerSession.INSTANCE.save();
+                InfoUtils.printActionbarMessage("shulkerplanner.message.hud_view", next.getDisplayName());
                 return true;
             }
             else if (key == Hotkeys.OPEN_CONFIG.getKeybind())

@@ -26,6 +26,8 @@ import it.marco.shulkerplanner.config.Configs;
 import it.marco.shulkerplanner.mixin.IMixinMaterialListBase;
 import it.marco.shulkerplanner.mixin.IMixinMaterialListPlacement;
 import it.marco.shulkerplanner.mixin.IMixinMaterialListSchematic;
+import it.marco.shulkerplanner.hud.HudStyle;
+import it.marco.shulkerplanner.hud.HudStyles;
 import it.marco.shulkerplanner.plan.BoxProgress;
 import it.marco.shulkerplanner.plan.CountMode;
 import it.marco.shulkerplanner.plan.PlannedBox;
@@ -390,11 +392,19 @@ public class PlannerSession implements IClientTickHandler
     }
 
     /**
-     * @return the name shown on the HUD: the schematic name of the active project
+     * @return the HUD style of the active project, or the default style without a project
+     */
+    public HudStyle getHudStyle()
+    {
+        return this.project != null ? this.project.getHudStyle() : HudStyles.getDefault();
+    }
+
+    /**
+     * @return the name shown on the HUD: the custom title, or the schematic name of the active project
      */
     public String getDisplayName()
     {
-        return this.project != null ? this.project.getSchematicName() : "";
+        return this.project != null ? this.getHudStyle().resolveTitle(this.project.getSchematicName()) : "";
     }
 
     public void setFocusedBox(int index)

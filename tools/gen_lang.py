@@ -138,7 +138,6 @@ t("gui.hover.slot.spare", "Scorta extra (riempimento slot vuoti)", "Extra spare 
 t("gui.hover.box.items", "%s item in %d slot", "%s items in %d slots")
 
 # HUD
-t("hud.progress", "Shulker pronte %s  -  Materiali %s", "Boxes ready %s  -  Materials %s")
 t("hud.current_box", "▶ Shulker #%d/%d", "▶ Box #%d/%d")
 t("hud.all_boxes_ready", "✔ Tutte le shulker sono pronte!", "✔ All the boxes are ready!")
 t("hud.box_items_ready", "✔ Hai tutto: riempi la shulker!", "✔ You have everything: fill the box!")
@@ -186,29 +185,84 @@ t("export.loose", "Da portare a parte:", "Carry separately:")
 # HUD views and editor
 t("hud.no_plan", "Nessun piano: premi M+B per crearlo", "No plan yet: press M+B to create it")
 t("hud.live", "contenuto rilevato", "contents tracked")
-t("hud.box_totals", "Dentro %s  -  In inventario %s  -  Mancano %s", "Inside %s  -  In inventory %s  -  Missing %s")
 t("hud.legend.in_box", " dentro", " inside")
 t("hud.legend.in_inventory", " da mettere", " to put in")
 t("hud.legend.partial", " in parte", " partial")
 t("hud.legend.missing", " manca", " missing")
 t("hud.remove", "Da togliere: %s %s", "Remove: %s %s")
-t("hud.put_in", "metti %s", "put in %s")
-t("hud.missing_have", "mancano %s (hai %s)", "missing %s (have %s)")
-t("hud.missing", "mancano %s", "missing %s")
-t("hud_view.compact", "Compatta", "Compact")
-t("hud_view.shulker", "Shulker", "Shulker box")
-t("hud_view.both", "Shulker + lista", "Box + list")
 t("hud_count.stacks", "Stack", "Stacks")
 t("hud_count.items", "Numero", "Items")
-t("hud_editor.view", "Vista: %s", "View: %s")
-t("hud_editor.counts", "Conteggi: %s", "Counts: %s")
-t("hud_editor.reset", "Posizione iniziale", "Reset position")
-t("hud_editor.done", "Fatto", "Done")
-t("hud_editor.hint", "Trascina l'HUD con il mouse per spostarlo", "Drag the HUD with the mouse to move it")
-t("hud_editor.no_project", "Nessun progetto attivo: apri prima lo Shulker Planner", "No active project: open the Shulker Planner first")
-t("gui.button.edit_hud", "Sposta HUD", "Move HUD")
-t("gui.button.edit_hud.hover", "Trascina l'HUD dove vuoi e scegli la vista\n(compatta, shulker o entrambe). Hotkey M+J", "Drag the HUD where you want and pick the view\n(compact, shulker box or both). Hotkey M+J")
 t("message.hud_view", "Vista HUD: %s", "HUD view: %s")
+
+
+# Customizable HUD
+t("hud.progress_boxes", "Shulker pronte", "Boxes ready")
+t("hud.progress_materials", "Materiali", "Materials")
+t("hud.totals_inside", "Dentro", "Inside")
+t("hud.totals_inventory", "In inventario", "In inventory")
+t("hud.totals_missing", "Mancano", "Missing")
+t("hud.put_in_label", "metti", "put in")
+t("hud.missing_label", "mancano", "missing")
+t("hud.have_label", "hai", "have")
+t("hud_element.title", "Titolo", "Title")
+t("hud_element.progress", "Progresso", "Progress")
+t("hud_element.box_header", "Shulker in corso", "Current box")
+t("hud_element.box_totals", "Totali shulker", "Box totals")
+t("hud_element.box_grid", "Interfaccia shulker 9x3", "Shulker box 9x3 view")
+t("hud_element.grid_legend", "Legenda colori", "Color legend")
+t("hud_element.box_items", "Lista item mancanti", "Missing items list")
+t("hud_element.wrong_items", "Item da togliere", "Items to remove")
+t("hud_element.box_status", "Riga di stato", "Status line")
+t("hud_element.reminders", "Promemoria", "Reminders")
+t("hud_color.background", "Sfondo", "Background")
+t("hud_color.accent", "Barra laterale", "Side bar")
+t("hud_color.border", "Bordo", "Border")
+t("hud_color.title", "Titolo", "Title")
+t("hud_color.text", "Testo", "Text")
+t("hud_color.label", "Etichette", "Labels")
+t("hud_color.good", "OK / dentro", "OK / inside")
+t("hud_color.info", "Info / da mettere", "Info / to put in")
+t("hud_color.warn", "Attenzione", "Warning")
+t("hud_color.bad", "Manca / errore", "Missing / error")
+t("hud_theme.purple", "Viola", "Purple")
+t("hud_theme.dark", "Scuro", "Dark")
+t("hud_theme.light", "Chiaro", "Light")
+t("hud_theme.ocean", "Oceano", "Ocean")
+t("hud_theme.emerald", "Smeraldo", "Emerald")
+t("hud_theme.sunset", "Tramonto", "Sunset")
+t("hud_theme.glass", "Vetro", "Glass")
+t("hud_theme.custom", "Personalizzato", "Custom")
+t("hud_preset.full", "Completa", "Full")
+t("hud_preset.shulker", "Solo shulker", "Shulker box")
+t("hud_preset.list", "Solo lista", "List only")
+t("hud_preset.minimal", "Minima", "Minimal")
+t("hud_preset.reminders", "Solo promemoria", "Reminders only")
+t("hud_editor.page.look", "Aspetto", "Look")
+t("hud_editor.page.elements", "Elementi", "Elements")
+t("hud_editor.page.layout", "Layout", "Layout")
+t("hud_editor.title", "Titolo", "Title")
+t("hud_editor.theme", "Tema", "Theme")
+t("hud_editor.opacity", "Opacità sfondo: %d%%", "Background opacity: %d%%")
+t("hud_editor.preset", "Vista: %s", "View: %s")
+t("hud_editor.preset_custom", "Personalizzata", "Custom")
+t("hud_editor.scale", "Dimensione: %d%%", "Size: %d%%")
+t("hud_editor.compact", "Compatto: %s", "Compact: %s")
+t("hud_editor.padding", "Margini: %d", "Padding: %d")
+t("hud_editor.shadow", "Ombra testo: %s", "Text shadow: %s")
+t("hud_editor.accent_bar", "Barra laterale: %s", "Side bar: %s")
+t("hud_editor.border", "Bordo: %s", "Border: %s")
+t("hud_editor.max_box_items", "Item shulker mostrati: %d", "Box items shown: %d")
+t("hud_editor.max_reminders", "Promemoria mostrati: %d", "Reminders shown: %d")
+t("hud_editor.counts", "Quantità: %s", "Amounts: %s")
+t("hud_editor.reset_position", "Posizione iniziale", "Reset position")
+t("hud_editor.save_default", "Usa come stile per i nuovi progetti", "Use as style for new projects")
+t("hud_editor.load_default", "Applica lo stile predefinito", "Apply the default style")
+t("hud_editor.done", "Fatto", "Done")
+t("hud_editor.no_project", "Nessuna schematica attiva: apri prima lo Shulker Planner", "No active schematic: open the Shulker Planner first")
+t("hud_editor.scroll", "Rotellina per scorrere", "Scroll for more")
+t("hud_editor.hint", "Trascina per spostare - angolo o rotellina per ridimensionare", "Drag to move - corner or mouse wheel to resize")
+t("gui.button.edit_hud", "Personalizza HUD", "Customize HUD")
+t("gui.button.edit_hud.hover", "Posizione, dimensione, titolo, tema, colori ed elementi\ndell'HUD di questa schematica. Hotkey M+J", "Position, size, title, theme, colors and elements\nof the HUD of this schematic. Hotkey M+J")
 
 # Config
 t("hotkeys.category.generic", "Hotkey", "Hotkeys")
@@ -216,15 +270,7 @@ t("hotkeys.category.generic", "Hotkey", "Hotkeys")
 configs = {
     "generic": [
         ("hudEnabled", "HUD promemoria", "Reminder HUD", "Mostra a schermo il progetto attivo, il progresso\ne i promemoria aperti", "Shows the active project, the progress\nand the open reminders on screen"),
-        ("hudOffsetX", "HUD posizione X", "HUD position X", "Posizione orizzontale dell'HUD", "Horizontal position of the HUD"),
-        ("hudOffsetY", "HUD posizione Y", "HUD position Y", "Posizione verticale dell'HUD", "Vertical position of the HUD"),
-        ("hudMaxReminders", "HUD max promemoria", "HUD max reminders", "Quanti promemoria aperti mostrare nell'HUD", "How many open reminders to show on the HUD"),
-        ("hudShowCurrentBox", "HUD shulker in corso", "HUD current box", "Mostra la shulker da riempire e gli item che ti mancano\n(conta solo gli item sciolti nell'inventario)", "Shows the box to fill and the items you still need\n(counts only the loose items in your inventory)"),
-        ("hudMaxBoxItems", "HUD max item shulker", "HUD max box items", "Quanti item della shulker in corso mostrare nell'HUD", "How many items of the current box to show on the HUD"),
-        ("hudBoxView", "HUD vista shulker", "HUD box view", "Come mostrare la shulker in corso: Compatta (solo cosa manca),\nShulker (interfaccia 9x3 colorata) o entrambe", "How to show the current box: Compact (only what is missing),\nShulker box (colored 9x3 interface) or both"),
-        ("hudCountFormat", "HUD conteggi", "HUD counts", "Quantità in stack (2 x 64 + 12) o in numero (140)", "Amounts as stacks (2 x 64 + 12) or as numbers (140)"),
         ("hudFollowSelectedPlacement", "HUD segue il placement", "HUD follows placement", "Quando selezioni un placement di Litematica che ha già un progetto,\nl'HUD passa a quella schematica", "When you select a Litematica placement that already has a project,\nthe HUD switches to that schematic"),
-        ("hudShowProgress", "HUD mostra progresso", "HUD show progress", "Mostra shulker pronte e materiali procurati nell'HUD", "Shows the ready boxes and gathered materials on the HUD"),
         ("packingAssistant", "Assistente riempimento", "Packing assistant", "Quando apri una shulker box mostra a lato cosa\ndeve contenere secondo il piano", "When opening a shulker box, shows next to it\nwhat it should contain according to the plan"),
         ("packingHighlightSlots", "Evidenzia slot", "Highlight slots", "Evidenzia in verde gli item da mettere nella shulker\ne in rosso quelli sbagliati", "Highlights the items to put into the box in green\nand the wrong ones in red"),
         ("autoMarkFilledBoxes", "Segna shulker automaticamente", "Auto mark filled boxes", "Segna come pronte le shulker riempite con l'assistente\no presenti nell'inventario con il contenuto giusto", "Marks boxes as ready when filled with the assistant\nor when they are in your inventory with the right contents"),
@@ -235,8 +281,8 @@ configs = {
         ("openShulkerPlanner", "Apri Shulker Planner", "Open Shulker Planner", "Apre il planner per la lista materiali corrente\no per il placement selezionato", "Opens the planner for the current material list\nor for the selected placement"),
         ("openReminders", "Apri promemoria", "Open reminders", "Apre direttamente la pagina dei promemoria", "Opens the reminders page directly"),
         ("toggleReminderHud", "Attiva/disattiva HUD", "Toggle HUD", "Attiva o disattiva l'HUD in gioco (promemoria e shulker in corso)", "Toggles the in-game HUD (reminders and current box)"),
-        ("editHudPosition", "Sposta HUD", "Move HUD", "Apre la schermata per trascinare l'HUD e sceglierne la vista", "Opens the screen to drag the HUD and pick its view"),
-        ("cycleHudView", "Cambia vista HUD", "Cycle HUD view", "Passa tra vista compatta, shulker ed entrambe", "Cycles between compact, shulker box and both views"),
+        ("editHudPosition", "Personalizza HUD", "Customize HUD", "Apre l'editor dell'HUD: posizione, dimensione, titolo, colori, temi ed elementi", "Opens the HUD editor: position, size, title, colors, themes and elements"),
+        ("cycleHudView", "Cambia vista HUD", "Cycle HUD view", "Passa tra le viste dell'HUD: completa, solo shulker, solo lista, minima, solo promemoria", "Cycles the HUD views: full, shulker box, list only, minimal, reminders only"),
         ("openConfigGui", "Apri configurazione", "Open configuration", "Apre la configurazione di Shulker Planner", "Opens the Shulker Planner configuration"),
     ],
 }

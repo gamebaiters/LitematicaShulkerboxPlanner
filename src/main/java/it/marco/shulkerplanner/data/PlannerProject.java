@@ -20,6 +20,8 @@ import net.minecraft.world.item.Items;
 
 import fi.dy.masa.malilib.util.data.json.JsonUtils;
 
+import it.marco.shulkerplanner.hud.HudStyle;
+import it.marco.shulkerplanner.hud.HudStyles;
 import it.marco.shulkerplanner.plan.CountMode;
 import it.marco.shulkerplanner.plan.ItemRequirement;
 import it.marco.shulkerplanner.plan.PackMode;
@@ -43,6 +45,7 @@ public class PlannerProject
     private final List<Reminder> reminders = new ArrayList<>();
     private String sourceTitle = "";
     private String schematicName = "";
+    @Nullable private HudStyle hudStyle;
     private long materialsUpdated;
 
     private CountMode countMode = CountMode.MISSING;
@@ -77,6 +80,24 @@ public class PlannerProject
         this.materials.addAll(materials);
         this.sourceTitle = sourceTitle;
         this.materialsUpdated = System.currentTimeMillis();
+    }
+
+    /**
+     * @return the HUD style of this project, created from the default style the first time
+     */
+    public HudStyle getHudStyle()
+    {
+        if (this.hudStyle == null)
+        {
+            this.hudStyle = HudStyles.createForProject();
+        }
+
+        return this.hudStyle;
+    }
+
+    public void setHudStyle(HudStyle style)
+    {
+        this.hudStyle = style;
     }
 
     /**
@@ -455,6 +476,11 @@ public class PlannerProject
         this.doneBoxes.forEach(boxes::addProperty);
         obj.add("done_boxes", boxes);
 
+        if (this.hudStyle != null)
+        {
+            obj.add("hud", this.hudStyle.toJson());
+        }
+
         JsonArray rem = new JsonArray();
         this.reminders.forEach(r -> rem.add(r.toJson()));
         obj.add("reminders", rem);
@@ -517,6 +543,13 @@ public class PlannerProject
                 }
                 catch (Exception ignore) {}
             }
+        }
+
+        if (JsonUtils.hasObject(obj, "hud"))
+        {
+            HudStyle style = new HudStyle();
+            style.fromJson(obj.getAsJsonObject("hud"));
+            project.hudStyle = style;
         }
 
         if (JsonUtils.hasArray(obj, "reminders"))
