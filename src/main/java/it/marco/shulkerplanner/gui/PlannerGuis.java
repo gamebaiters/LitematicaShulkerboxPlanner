@@ -6,14 +6,13 @@ import net.minecraft.client.gui.screens.Screen;
 
 import fi.dy.masa.litematica.data.DataManager;
 import fi.dy.masa.litematica.materials.MaterialListBase;
+import fi.dy.masa.litematica.materials.MaterialListPlacement;
 import fi.dy.masa.litematica.schematic.placement.SchematicPlacement;
 import fi.dy.masa.malilib.gui.GuiBase;
 import fi.dy.masa.malilib.gui.Message.MessageType;
 import fi.dy.masa.malilib.util.InfoUtils;
 
-import it.marco.shulkerplanner.config.Configs;
 import it.marco.shulkerplanner.data.PlannerSession;
-import it.marco.shulkerplanner.data.ProjectStorage;
 
 public class PlannerGuis
 {
@@ -49,24 +48,33 @@ public class PlannerGuis
     }
 
     /**
-     * Opens the planner for the best available source: the last viewed Litematica material list,
-     * the material list of the selected placement, or the last used project.
+     * Opens the planner for the schematic the player is working on:
+     * the placement selected in Litematica, otherwise the last viewed Litematica material list
+     * as long as its schematic is still loaded, otherwise the active project if it is loaded.
      */
     public static void openPlanner(@Nullable Screen parent, @Nullable PlannerTab tab)
     {
         PlannerTab openTab = tab != null ? tab : lastTab;
         PlannerSession session = PlannerSession.INSTANCE;
-        MaterialListBase materialList = DataManager.getMaterialList();
+        MaterialListBase materialList = null;
+        SchematicPlacement placement = DataManager.getSchematicPlacementManager().getSelectedSchematicPlacement();
 
-        if (materialList == null)
+        if (placement != null)
         {
-            SchematicPlacement placement = DataManager.getSchematicPlacementManager().getSelectedSchematicPlacement();
+            materialList = placement.getMaterialList();
 
-            if (placement != null)
+            if (materialList.getMaterialsAll().isEmpty())
             {
-                materialList = placement.getMaterialList();
                 materialList.reCreateMaterialList();
-                DataManager.setMaterialList(materialList);
+            }
+        }
+        else
+        {
+            MaterialListBase last = DataManager.getMaterialList();
+
+            if (last != null && isLoaded(last))
+            {
+                materialList = last;
             }
         }
 
@@ -74,19 +82,36 @@ public class PlannerGuis
         {
             session.openForMaterialList(materialList);
         }
-        else if (session.getProject() == null)
+        else if (session.getProject() == null || session.isLoadedInGame() == false)
         {
-            String last = Configs.Generic.LAST_PROJECT.getStringValue();
-
-            if (last.isEmpty() || ProjectStorage.exists(last) == false)
-            {
-                InfoUtils.showGuiOrInGameMessage(MessageType.WARNING, "shulkerplanner.message.no_schematic");
-                return;
-            }
-
-            session.openProject(last);
+            InfoUtils.showGuiOrInGameMessage(MessageType.WARNING, "shulkerplanner.message.no_schematic");
+            return;
         }
 
         GuiBase.openGui(create(openTab, parent));
+    }
+
+    /**
+     * @return false for the material list of a placement that has been removed in the meantime
+     */
+    private static boolean isLoaded(MaterialListBase list)
+    {
+        if (list instanceof MaterialListPlacement)
+        {
+            String name = list.getName();
+
+            // Only the names: getMaterialList() would start a counting task for every placement
+            for (SchematicPlacement placement : DataManager.getSchematicPlacementManager().getAllSchematicsPlacements())
+            {
+                if (placement.getName().equals(name))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        return true;
     }
 }

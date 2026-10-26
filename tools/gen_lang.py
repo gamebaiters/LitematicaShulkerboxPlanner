@@ -160,7 +160,7 @@ t("message.hold_shift_to_reset", "Tieni premuto Shift e clicca per azzerare", "H
 t("message.hud_enabled", "HUD promemoria attivo", "Reminder HUD enabled")
 t("message.hud_disabled", "HUD promemoria disattivato", "Reminder HUD disabled")
 t("message.inventory_full", "Inventario pieno (oppure non sei in creativa)", "Inventory full (or not in creative mode)")
-t("message.no_schematic", "Shulker Planner: nessuna lista materiali o schematica selezionata", "Shulker Planner: no material list or selected schematic")
+t("message.no_schematic", "Shulker Planner: seleziona un placement di Litematica (o apri la sua lista materiali)", "Shulker Planner: select a Litematica placement (or open its material list)")
 t("message.refreshing_materials", "Aggiornamento lista materiali...", "Refreshing the material list...")
 t("message.reminder_added", "Promemoria aggiunto: %s", "Reminder added: %s")
 t("message.reminders_added", "Aggiunti %d promemoria", "Added %d reminders")
@@ -184,6 +184,7 @@ t("export.loose", "Da portare a parte:", "Carry separately:")
 
 
 # HUD views and editor
+t("hud.no_plan", "Nessun piano: premi M+B per crearlo", "No plan yet: press M+B to create it")
 t("hud.live", "contenuto rilevato", "contents tracked")
 t("hud.box_totals", "Dentro %s  -  In inventario %s  -  Mancano %s", "Inside %s  -  In inventory %s  -  Missing %s")
 t("hud.legend.in_box", " dentro", " inside")

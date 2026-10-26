@@ -27,10 +27,15 @@ import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 
+import fi.dy.masa.litematica.data.DataManager;
 import fi.dy.masa.litematica.gui.GuiMainMenu;
 import fi.dy.masa.litematica.gui.GuiMaterialList;
 import fi.dy.masa.litematica.materials.MaterialListBase;
 import fi.dy.masa.litematica.materials.MaterialListEntry;
+import fi.dy.masa.litematica.schematic.LitematicaSchematic;
+import fi.dy.masa.litematica.schematic.placement.SchematicPlacement;
+import fi.dy.masa.litematica.selection.AreaSelection;
+import fi.dy.masa.litematica.selection.Box;
 import fi.dy.masa.malilib.gui.GuiBase;
 import fi.dy.masa.malilib.gui.button.ButtonBase;
 import fi.dy.masa.malilib.util.input.ScanCodes;
@@ -100,6 +105,7 @@ public class ShulkerPlannerClientGameTest implements FabricClientGameTest
             ctx.waitTicks(40);
 
             this.functionalChecks(ctx, sp);
+            this.placementSelectionChecks(ctx, sp);
             this.showcase(ctx, sp);
 
             log("ALL CHECKS PASSED");
@@ -178,6 +184,8 @@ public class ShulkerPlannerClientGameTest implements FabricClientGameTest
 
         // --- A real shulker box in the world, filled by the server while the screen is open
         sp.getServer().runCommand("clear @a");
+        // Wait for the cleared inventory to reach the client, the scan would mark the box again otherwise
+        ctx.waitTicks(10);
         ctx.runOnClient(mc -> {
             PlannerSession.INSTANCE.getProject().clearDoneBoxes();
             PlannerSession.INSTANCE.onProjectChanged();
@@ -358,6 +366,158 @@ public class ShulkerPlannerClientGameTest implements FabricClientGameTest
         ctx.runOnClient(mc -> mc.gui.setScreen(null));
         ctx.waitTicks(5);
         log("Functional checks passed");
+    }
+
+    // ------------------------------------------------------------------ real Litematica placements
+
+    /**
+     * Two real schematics saved from the world, placed with Litematica: the planner and the HUD must always
+     * follow the selected placement, and only show schematics that are loaded.
+     */
+    private void placementSelectionChecks(ClientGameTestContext ctx, TestSingleplayerContext sp)
+    {
+        BlockPos base = sp.getServer().computeOnServer(server -> server.getPlayerList().getPlayers().getFirst().blockPosition());
+        int x = base.getX() + 10;
+        int y = base.getY();
+        int z = base.getZ() + 10;
+
+        // House A: stone bricks and glass. Tower B: oak planks and lanterns.
+        sp.getServer().runCommand(String.format("fill %d %d %d %d %d %d stone_bricks", x, y, z, x + 4, y + 2, z + 4));
+        sp.getServer().runCommand(String.format("fill %d %d %d %d %d %d glass", x + 1, y + 3, z + 1, x + 3, y + 3, z + 3));
+        sp.getServer().runCommand(String.format("fill %d %d %d %d %d %d oak_planks", x + 10, y, z, x + 12, y + 5, z + 2));
+        sp.getServer().runCommand(String.format("setblock %d %d %d lantern", x + 11, y + 6, z + 1));
+        ctx.waitTicks(20);
+
+        ctx.runOnClient(mc -> {
+            var manager = DataManager.getSchematicPlacementManager();
+            var houseA = createSchematic(mc, "House A", new BlockPos(x, y, z), new BlockPos(x + 4, y + 3, z + 4));
+            var towerB = createSchematic(mc, "Tower B", new BlockPos(x + 10, y, z), new BlockPos(x + 12, y + 6, z + 2));
+            var tower2 = createSchematic(mc, "Tower C", new BlockPos(x + 10, y, z), new BlockPos(x + 12, y + 6, z + 2));
+            manager.addSchematicPlacement(SchematicPlacement.createFor(houseA, new BlockPos(x, y + 20, z), "House A", true, true), false);
+            manager.addSchematicPlacement(SchematicPlacement.createFor(towerB, new BlockPos(x + 10, y + 20, z), "Tower B", true, true), false);
+            manager.addSchematicPlacement(SchematicPlacement.createFor(tower2, new BlockPos(x + 20, y + 20, z), "Tower C", true, true), false);
+            DataManager.setMaterialList(null);
+        });
+
+        String[] names = { "House A", "Tower B", "House A" };
+        String[] expect = { "minecraft:stone_bricks", "minecraft:oak_planks", "minecraft:stone_bricks" };
+
+        for (int i = 0; i < names.length; ++i)
+        {
+            String name = names[i];
+            ctx.runOnClient(mc -> {
+                selectPlacement(name);
+                PlannerGuis.openPlanner(null, PlannerTab.MATERIALS);
+            });
+            ctx.waitFor(mc -> PlannerSession.INSTANCE.getProject() != null &&
+                              PlannerSession.INSTANCE.getProject().getMaterials().isEmpty() == false &&
+                              PlannerSession.INSTANCE.getProject().getName().equals(name), 400);
+            String[] state = ctx.computeOnClient(mc -> {
+                PlannerProject project = PlannerSession.INSTANCE.getProject();
+                StringBuilder sb = new StringBuilder();
+                project.getMaterials().forEach(r -> sb.append(r.getId()).append('=').append(r.getTotal()).append(' '));
+                return new String[] { project.getName(), project.getSchematicName(), sb.toString(), String.valueOf(PlannerSession.INSTANCE.isLoadedInGame()) };
+            });
+            log("Selected '%s' -> project '%s', schematic '%s', loaded=%s, materials: %s", name, state[0], state[1], state[3], state[2]);
+            check(state[0].equals(name), "the planner opened '" + state[0] + "' instead of the selected '" + name + "'");
+            check(state[2].contains(expect[i]), "the materials are not the ones of '" + name + "'");
+            check(state[3].equals("true"), "a selected placement must count as loaded");
+            ctx.runOnClient(mc -> {
+                mc.gui.setScreen(null);
+                // Litematica remembers the first material list that was opened (this is what made the planner stick to one schematic)
+                if (DataManager.getMaterialList() == null)
+                {
+                    DataManager.setMaterialList(PlannerSession.INSTANCE.getMaterialList());
+                }
+            });
+        }
+
+        // Selecting a placement with a plan switches the HUD by itself, without opening the planner
+        ctx.runOnClient(mc -> selectPlacement("Tower B"));
+        ctx.waitTicks(3);
+        String followed = ctx.computeOnClient(mc -> PlannerSession.INSTANCE.getProject().getName());
+        log("HUD follows the selection: %s", followed);
+        check(followed.equals("Tower B"), "the HUD did not follow the selected placement");
+
+        // A placement without a plan: the HUD shows the hint, not the previous schematic
+        ctx.runOnClient(mc -> selectPlacement("Tower C"));
+        ctx.waitTicks(3);
+        String hint = ctx.computeOnClient(mc -> String.valueOf(PlannerSession.INSTANCE.getUnplannedSelection()));
+        boolean shownC = ctx.computeOnClient(mc -> PlannerSession.INSTANCE.isLoadedInGame());
+        log("Unplanned selection: hint=%s, previous project shown=%s", hint, shownC);
+        check(hint.equals("Tower C") && shownC == false, "an unplanned selection must not show another schematic on the HUD");
+
+        // Unloading the schematic shown on the HUD: Litematica selects another placement and the HUD follows it
+        ctx.runOnClient(mc -> {
+            selectPlacement("Tower B");
+            var manager = DataManager.getSchematicPlacementManager();
+
+            for (SchematicPlacement placement : new ArrayList<>(manager.getAllSchematicsPlacements()))
+            {
+                if (placement.getName().equals("Tower B"))
+                {
+                    manager.removeSchematicPlacement(placement);
+                }
+            }
+        });
+        ctx.waitTicks(25);
+        String afterUnload = ctx.computeOnClient(mc -> PlannerSession.INSTANCE.getProject().getName() + " shown=" + PlannerSession.INSTANCE.isLoadedInGame());
+        log("After unloading Tower B the HUD shows: %s", afterUnload);
+        check(afterUnload.startsWith("Tower B") == false, "the HUD still shows the unloaded Tower B");
+
+        // Nothing loaded at all: no HUD
+        ctx.runOnClient(mc -> {
+            var manager = DataManager.getSchematicPlacementManager();
+            manager.setSelectedSchematicPlacement(null);
+
+            for (SchematicPlacement placement : new ArrayList<>(manager.getAllSchematicsPlacements()))
+            {
+                manager.removeSchematicPlacement(placement);
+            }
+
+            DataManager.setMaterialList(null);
+        });
+        ctx.waitTicks(25);
+        boolean shownNothingLoaded = ctx.computeOnClient(mc -> PlannerSession.INSTANCE.isLoadedInGame() || PlannerSession.INSTANCE.getUnplannedSelection() != null);
+        log("HUD shown with no schematic loaded: %s", shownNothingLoaded);
+        check(shownNothingLoaded == false, "the HUD is shown while no schematic is loaded");
+
+        // The planner hotkey with nothing selected and nothing loaded must not reopen an old schematic
+        boolean opened = ctx.computeOnClient(mc -> {
+            PlannerGuis.openPlanner(null, null);
+            return mc.gui.screen() != null && mc.gui.screen().getClass().getSimpleName().startsWith("GuiPlanner");
+        });
+        log("Planner opened with nothing loaded: %s", opened);
+        check(opened == false, "the planner opened an unloaded schematic");
+        ctx.waitTicks(5);
+        sp.getServer().runCommand(String.format("fill %d %d %d %d %d %d air", x, y, z, x + 12, y + 6, z + 4));
+        log("Placement selection checks passed");
+    }
+
+    private static LitematicaSchematic createSchematic(Minecraft mc, String name, BlockPos pos1, BlockPos pos2)
+    {
+        AreaSelection area = new AreaSelection();
+        area.addSubRegionBox(new Box(pos1, pos2, name), false);
+        LitematicaSchematic schematic = LitematicaSchematic.createFromWorld(mc.level, area,
+                new LitematicaSchematic.SchematicSaveInfo(false, false), "MarcoTech81", str -> {});
+        schematic.getMetadata().setName(name);
+        return schematic;
+    }
+
+    private static void selectPlacement(String name)
+    {
+        var manager = DataManager.getSchematicPlacementManager();
+
+        for (SchematicPlacement placement : manager.getAllSchematicsPlacements())
+        {
+            if (placement.getName().equals(name))
+            {
+                manager.setSelectedSchematicPlacement(placement);
+                return;
+            }
+        }
+
+        throw new AssertionError("No placement named " + name);
     }
 
     // ------------------------------------------------------------------ showcase screenshots

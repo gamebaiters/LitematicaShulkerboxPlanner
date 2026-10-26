@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.1 - Minecraft 26.3
+
+- Fixed the planner always opening the same schematic. The `M + B` hotkey and the Litematica main menu button now use the placement selected in Litematica. Before, they used the first material list Litematica had remembered.
+- The HUD only shows schematics that are loaded in the game (placed or loaded in Litematica). Unloading a schematic hides it.
+- Selecting a placement switches the HUD right away. A selected placement without a plan shows a hint to press `M + B`, instead of the previous schematic.
+
 ## 1.1.0 - Minecraft 26.3
 
 - The HUD shows the box you're filling as a real shulker box interface (9x3), each slot colored by state:

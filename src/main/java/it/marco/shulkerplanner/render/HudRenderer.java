@@ -84,15 +84,23 @@ public class HudRenderer implements IRenderer
     {
         PlannerSession session = PlannerSession.INSTANCE;
         PlannerProject project = session.getProject();
+        List<Element> elements = new ArrayList<>();
 
-        if (project == null)
+        if (session.getUnplannedSelection() != null)
+        {
+            // The selected placement has no plan yet: say how to make one, instead of showing another schematic
+            elements.add(Line.text(GuiBase.TXT_LIGHT_PURPLE + GuiBase.TXT_BOLD + Format.trim(session.getUnplannedSelection(), MAX_TEXT_WIDTH)));
+            elements.add(Line.text(GuiBase.TXT_GRAY + StringUtils.translate("shulkerplanner.hud.no_plan")));
+            return this.draw(ctx, elements);
+        }
+
+        if (project == null || session.isLoadedInGame() == false)
         {
             this.lastWidth = 0;
             this.lastHeight = 0;
             return false;
         }
 
-        List<Element> elements = new ArrayList<>();
         ShulkerPlan plan = session.getPlan();
 
         elements.add(Line.text(GuiBase.TXT_LIGHT_PURPLE + GuiBase.TXT_BOLD + Format.trim(session.getDisplayName(), MAX_TEXT_WIDTH)));
@@ -112,6 +120,11 @@ public class HudRenderer implements IRenderer
             this.addReminders(elements, project);
         }
 
+        return this.draw(ctx, elements);
+    }
+
+    private boolean draw(GuiContext ctx, List<Element> elements)
+    {
         int width = 0;
         int height = 0;
 

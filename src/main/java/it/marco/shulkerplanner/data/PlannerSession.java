@@ -12,6 +12,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.item.ItemStack;
 
 import fi.dy.masa.litematica.data.DataManager;
+import fi.dy.masa.litematica.data.SchematicHolder;
 import fi.dy.masa.litematica.materials.MaterialListBase;
 import fi.dy.masa.litematica.materials.MaterialListPlacement;
 import fi.dy.masa.litematica.materials.MaterialListSchematic;
@@ -57,6 +58,8 @@ public class PlannerSession implements IClientTickHandler
     /** Contents of the non-empty shulker boxes in the inventory, to show partially filled boxes on the HUD */
     private List<Map<String, Integer>> inventoryShulkers = new ArrayList<>();
     @Nullable private Object lastSelectedPlacement;
+    @Nullable private String unplannedSelection;
+    private boolean loadedInGame;
 
     private PlannerSession()
     {
@@ -139,6 +142,10 @@ public class PlannerSession implements IClientTickHandler
         }
 
         Configs.Generic.LAST_PROJECT.setValueFromString(name);
+        this.unplannedSelection = null;
+        // A project opened on purpose stays active until the selection in Litematica changes again
+        this.lastSelectedPlacement = DataManager.getSchematicPlacementManager().getSelectedSchematicPlacement();
+        this.loadedInGame = this.computeLoadedInGame();
     }
 
     /**
@@ -565,7 +572,20 @@ public class PlannerSession implements IClientTickHandler
     @Override
     public void onClientTick(Minecraft mc)
     {
-        if (this.project == null || mc.player == null)
+        if (mc.player == null || mc.level == null)
+        {
+            return;
+        }
+
+        // Follow the placement selection right away, also when no project is open yet
+        this.followSelectedPlacement();
+
+        if (++this.tickCounter % 10 == 0)
+        {
+            this.loadedInGame = this.computeLoadedInGame();
+        }
+
+        if (this.project == null)
         {
             return;
         }
@@ -573,11 +593,10 @@ public class PlannerSession implements IClientTickHandler
         // The HUD shows what the player carries for the current box: keep it updated every tick
         this.loose = InventoryScanner.countLooseItems(mc.player);
 
-        if (++this.tickCounter >= 20)
+        if (this.tickCounter >= 20)
         {
             this.tickCounter = 0;
             this.refreshInventory(true);
-            this.followSelectedPlacement();
         }
         else if (this.tickCounter % 4 == 0)
         {
@@ -586,44 +605,108 @@ public class PlannerSession implements IClientTickHandler
     }
 
     /**
-     * Switches to the saved project of the placement selected in Litematica, if there is one
+     * @return true if the schematic of the active project is currently loaded in Litematica
+     * (as a placement, or as a loaded schematic). The HUD is only shown for loaded schematics.
+     */
+    public boolean isLoadedInGame()
+    {
+        return this.project != null && this.loadedInGame && this.unplannedSelection == null;
+    }
+
+    /**
+     * @return the name of the selected placement when it has no plan yet, otherwise null
+     */
+    @Nullable
+    public String getUnplannedSelection()
+    {
+        return this.unplannedSelection;
+    }
+
+    private boolean computeLoadedInGame()
+    {
+        if (this.project == null)
+        {
+            return false;
+        }
+
+        String name = this.project.getName();
+
+        try
+        {
+            for (SchematicPlacement placement : DataManager.getSchematicPlacementManager().getAllSchematicsPlacements())
+            {
+                if (name.equals(placement.getName()))
+                {
+                    return true;
+                }
+            }
+
+            for (LitematicaSchematic schematic : SchematicHolder.getInstance().getAllSchematics())
+            {
+                if (name.equals(schematic.getMetadata().getName()))
+                {
+                    return true;
+                }
+            }
+        }
+        catch (Exception ignore)
+        {
+        }
+
+        // Lists that don't come from a schematic (area analysis, custom lists) are loaded as long as they're linked
+        return this.materialList != null &&
+               (this.materialList instanceof MaterialListPlacement) == false &&
+               (this.materialList instanceof MaterialListSchematic) == false;
+    }
+
+    /**
+     * Makes the active project follow the placement selected in Litematica.
+     * A selected placement without a plan hides the HUD of the previous project and shows a hint instead.
      */
     private void followSelectedPlacement()
     {
-        if (Configs.Generic.HUD_FOLLOW_PLACEMENT.getBooleanValue() == false)
-        {
-            return;
-        }
-
         SchematicPlacement placement = DataManager.getSchematicPlacementManager().getSelectedSchematicPlacement();
 
-        if (placement == null || placement == this.lastSelectedPlacement)
+        if (placement == this.lastSelectedPlacement)
         {
             return;
         }
 
         this.lastSelectedPlacement = placement;
+        this.unplannedSelection = null;
 
-        if (this.project != null && this.project.getName().equals(placement.getName()))
+        if (placement == null || Configs.Generic.HUD_FOLLOW_PLACEMENT.getBooleanValue() == false)
         {
+            this.loadedInGame = this.computeLoadedInGame();
             return;
         }
 
-        if (ProjectStorage.exists(placement.getName()))
-        {
-            MaterialListBase list = placement.getMaterialList();
+        String name = placement.getName();
 
-            if (list != null && list.getMaterialsAll().isEmpty() == false)
+        if (this.project == null || this.project.getName().equals(name) == false)
+        {
+            if (ProjectStorage.exists(name))
             {
-                this.openForMaterialList(list);
+                MaterialListBase list = placement.getMaterialList();
+
+                if (list != null && list.getMaterialsAll().isEmpty() == false)
+                {
+                    this.openForMaterialList(list);
+                }
+                else
+                {
+                    this.openProject(name);
+                }
+
+                this.notifyUpdate();
             }
             else
             {
-                this.openProject(placement.getName());
+                this.unplannedSelection = name;
             }
-
-            this.notifyUpdate();
         }
+
+        this.loadedInGame = this.computeLoadedInGame();
     }
 
     public void onWorldChanged(boolean joined)
@@ -640,6 +723,8 @@ public class PlannerSession implements IClientTickHandler
         this.liveBox = -1;
         this.liveContents = new HashMap<>();
         this.lastSelectedPlacement = null;
+        this.unplannedSelection = null;
+        this.loadedInGame = false;
         this.invalidate();
 
         if (joined && this.project == null)
