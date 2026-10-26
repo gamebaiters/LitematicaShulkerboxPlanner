@@ -1,0 +1,15 @@
+{
+	"required": true,
+	"package": "it.marco.shulkerplanner.mixin",
+	"compatibilityLevel": "JAVA_25",
+	"minVersion": "0.8",
+	"client": [
+		"IMixinMaterialListBase",
+		"MixinAbstractContainerScreen",
+		"MixinGuiMainMenu",
+		"MixinGuiMaterialList"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}
