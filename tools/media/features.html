@@ -1,0 +1,40 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@700&family=Inter:wght@500;700;800&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; padding: 0; }
+  body {
+    width: 1920px; height: 1080px; overflow: hidden;
+    background: radial-gradient(1400px 700px at 10% 0%, #34205a 0%, transparent 60%),
+                radial-gradient(1100px 700px at 100% 100%, #17414f 0%, transparent 55%), #110b1b;
+    font-family: Inter, sans-serif; color: #fff;
+  }
+  header { display: flex; align-items: center; gap: 22px; padding: 46px 70px 0; }
+  header img { width: 72px; height: 72px; image-rendering: pixelated; }
+  header h1 { font-family: Silkscreen, monospace; font-size: 46px; margin: 0;
+              background: linear-gradient(90deg, #f3d9ff, #c98bff 55%, #8fd8ff); -webkit-background-clip: text; color: transparent; }
+  header span { font-size: 24px; color: #cbbedd; margin-left: 10px; }
+  .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 34px 40px; padding: 36px 70px; }
+  .tile { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.1); border-radius: 14px; overflow: hidden; }
+  .img { height: 352px; background-size: cover; background-position: center; }
+  .cap { padding: 14px 20px 16px; }
+  .cap b { font-size: 24px; display: block; margin-bottom: 4px; }
+  .cap span { font-size: 18px; color: #c9bfd6; }
+  .t1 .img { background-image: url(shot_a.png); }
+  .t2 .img { background-image: url(shot_c.png); background-position: 62% 45%; background-size: 160%; }
+  .t3 .img { background-image: url(shot_d.png); background-position: 0% 12%; background-size: 170%; }
+  .t4 .img { background-image: url(shot_e.png); }
+</style>
+</head>
+<body>
+  <header><img src="icon.png"><h1>Shulker Planner</h1><span>for Litematica</span></header>
+  <div class="tiles">
+    <div class="tile t1"><div class="img"></div><div class="cap"><b>The whole build, box by box</b><span>Minimum number of shulker boxes, every slot respecting stack limits.</span></div></div>
+    <div class="tile t2"><div class="img"></div><div class="cap"><b>Packing assistant</b><span>Open a box: see what goes in, what's missing and what's wrong.</span></div></div>
+    <div class="tile t3"><div class="img"></div><div class="cap"><b>In-game HUD</b><span>The box you're filling, the items you still need and your reminders.</span></div></div>
+    <div class="tile t4"><div class="img"></div><div class="cap"><b>Materials &amp; reminders</b><span>Include, exclude, mark as gathered and turn anything into a to-do.</span></div></div>
+  </div>
+</body>
+</html>
