@@ -1,0 +1,11 @@
+{
+	"schemaVersion": 1,
+	"id": "shulkerplanner-gametest",
+	"version": "1.0.0",
+	"name": "Shulker Planner client game tests",
+	"environment": "client",
+	"entrypoints": {
+		"fabric-client-gametest": ["it.marco.shulkerplanner.gametest.ShulkerPlannerClientGameTest"]
+	},
+	"depends": { "shulkerplanner": "*" }
+}
