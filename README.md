@@ -21,14 +21,15 @@ It's for the moment before a big build, when you'd otherwise be staring at a lis
 ## Features
 
 ### The plan, box by box
-Every box is shown as a 9×3 grid, exactly as it will look in game.
+Every box is shown as a card with its 9×3 grid, exactly as it will look in game, and its state: *To fill*, *Filling*, *Ready*.
 
 - **Minimum number of boxes.** Stack sizes (64 / 16 / 1) and the 27 slots of a box are always respected.
 - **Three packing modes:**
   - **Smart:** single-item boxes for bulk materials, then the leftovers grouped so that as few items as possible get split.
   - **Sequential:** everything in category order.
   - **One item per box:** never mixes item types.
-- **Options:** round every item up to full stacks, fill leftover slots with spares, and pick the box color.
+- **Options:** round every item up to full stacks, fill leftover slots with spares, pick the box color, pack the raw materials instead of the finished blocks.
+- **A plan that stays put.** While you're still choosing, the plan follows the material list (*Draft*). As soon as you start (mark a box, link a shulker box) or press *Lock plan*, boxes keep their number and contents. If the material list changes you get a banner, and *Update plan* repacks only the boxes you haven't started.
 - Items that can't go in a shulker box (shulker boxes themselves) are listed separately, so you don't forget them.
 
 <p align="center"><img src="docs/images/screenshots/shulker-boxes.png" width="85%"></p>
@@ -36,11 +37,15 @@ Every box is shown as a 9×3 grid, exactly as it will look in game.
 ### Packing assistant
 Open any shulker box and a panel appears next to it.
 
-- It shows which planned box this is, what is already inside, what's still missing and how much of it you're carrying.
-- Items to move in are highlighted **green**, wrong items **red**.
-- When the box matches the plan it's marked as ready on its own.
+- **You decide which box it is.** A new shulker box is never assigned on its own: the panel shows a preview of the suggested box, you pick one with ◀ ▶ and press **Link**.
+- **The link follows the shulker box.** Break it, carry it, place it somewhere else: it's still that box (recognised by color, name and contents).
+- It shows what is already inside, what's still missing and how much of it you're carrying. Items to move in are highlighted **green**, wrong items **red**, too many **orange**.
+- When a linked box matches the plan it's marked as ready on its own. *Unlink*, *Mark done* and *Follow on HUD* are one click away.
 
-<p align="center"><img src="docs/images/screenshots/packing-assistant.png" width="85%"></p>
+<p align="center">
+  <img src="docs/images/screenshots/packing-assistant-unlinked.png" width="49%">
+  <img src="docs/images/screenshots/packing-assistant.png" width="49%">
+</p>
 
 ### In-game HUD
 An overlay that follows you while you build and pack:
@@ -75,23 +80,35 @@ Every schematic has its own HUD. Open the editor with **M + J** (or *Customize H
   <img src="docs/images/screenshots/hud-light.png" width="32%">
 </p>
 
-### Materials and reminders
-- **Materials tab:**
-  - Include or exclude any item, and mark items as gathered.
-  - Choose what to count: total, still missing in the world, or still to gather (missing minus what you already carry, including inside boxes and bundles).
-  - Multiplier for building the same thing several times.
-- **Reminders tab:**
-  - A simple to-do list that is saved with the schematic.
-  - Every material and every box has a *+ Note* button. One click creates a reminder for each missing material.
+### Materials
+- For every material: **Needed**, **Packed** (in boxes that are ready or being filled), **Carrying** (inventory, bundles, shulker boxes not linked to the plan) and **To get**, with a progress bar. Nothing is counted twice.
+- Choose what to count: everything (*Total*) or only what's still missing in the world (*Missing*), with a multiplier for building the same thing several times.
+- Include or exclude any item, mark items as gathered. Entries you hid in Litematica's material list are left out.
+
+<p align="center"><img src="docs/images/screenshots/materials.png" width="85%"></p>
+
+### Raw materials
+Everything on the list broken down into what you actually have to gather: cobblestone instead of stone bricks, logs instead of stairs, sand, raw iron...
+
+- Every crafting step in order: how many crafts, at which station (crafting table, stonecutter, furnace, smithing table), the ingredients and the leftovers.
+- Recipes come from the world in singleplayer (data packs and mods included) and from the game on servers.
+- Turn the furnace or the stonecutter off, choose another recipe for an item, or keep an item as it is.
+- *Pack raw items* plans the shulker boxes with the raw materials.
+
+<p align="center"><img src="docs/images/screenshots/raw-materials.png" width="85%"></p>
+
+### Reminders and settings
+- **Reminders:** a simple to-do list saved with the schematic. Every material and every box has a *+ Note* button.
+- **Settings:** every warning and highlight can be turned off on its own (items to remove, slot highlights, HUD warnings, hints, messages), or all at once.
 
 <p align="center">
-  <img src="docs/images/screenshots/materials.png" width="49%">
   <img src="docs/images/screenshots/reminders.png" width="49%">
+  <img src="docs/images/screenshots/settings.png" width="49%">
 </p>
 
 ### Also
 - **Creative mode:** *Create* / *Create all* puts the boxes in your inventory, already filled and named (`#3/11 Stone Bricks`).
-- **Automatic detection:** filled boxes in your inventory are recognised and counted as ready. Identical boxes are counted one by one.
+- **Automatic detection:** filled boxes in your inventory that match a box exactly are counted as ready (can be turned off). Identical boxes are counted one by one.
 - **Export:** the whole plan goes to a text file, or Shift + click copies it to the clipboard.
 - **Saved per schematic:** everything lives in `config/shulkerplanner/projects/`. The HUD keeps working after a restart, even before the material list is re-created.
 - **Languages:** English and Italian.
@@ -104,7 +121,7 @@ Every schematic has its own HUD. Open the editor with **M + J** (or *Customize H
 2. Press **Shulker Planner** in the bottom right corner.
    - You can also use the button in the Litematica main menu, or `M + B` with a placement selected.
 3. Pick a packing mode and what to count, and exclude anything you don't want to carry.
-4. Fill the boxes. The assistant and the HUD show what's left.
+4. Open a shulker box, choose its box in the panel and press **Link**. Fill it: the assistant and the HUD show what's left.
 
 | Hotkey | Action |
 |---|---|
@@ -144,7 +161,7 @@ Needs JDK 25. `bash tools/media/render.sh` turns the game test screenshots into 
 
 ## Italiano
 
-Addon per Litematica che calcola quante shulker box servono per una schematica e cosa mettere in ognuna, slot per slot. Include un assistente di riempimento, un HUD in gioco con la shulker in corso, personalizzabile per ogni schematica (dimensione, titolo, temi, colori, elementi), e una lista di promemoria. Il gioco in italiano mostra l'interfaccia tradotta.
+Addon per Litematica che calcola quante shulker box servono per una schematica e cosa mettere in ognuna, slot per slot. Il piano resta fisso appena inizi a lavorarci; ogni shulker si collega a mano alla sua fase e resta collegata anche se la rompi e la ripiazzi altrove. Mostra per ogni materiale quanto serve, quanto è già impacchettato, quanto hai addosso e quanto manca, e può calcolare le materie prime (cobblestone, tronchi, sabbia...) con tutti i passaggi di crafting. Include un assistente di riempimento, un HUD in gioco personalizzabile per ogni schematica, una lista di promemoria e avvisi tutti disattivabili. Il gioco in italiano mostra l'interfaccia tradotta.
 
 ## License
 

@@ -110,6 +110,7 @@ public class ShulkerPlannerClientGameTest implements FabricClientGameTest
 
             this.functionalChecks(ctx, sp);
             this.placementSelectionChecks(ctx, sp);
+            this.linkingChecks(ctx, sp);
             this.showcase(ctx, sp);
 
             log("ALL CHECKS PASSED");
@@ -739,7 +740,13 @@ public class ShulkerPlannerClientGameTest implements FabricClientGameTest
             ShulkerBoxBlockEntity be = (ShulkerBoxBlockEntity) server.getPlayerList().getPlayers().getFirst().level().getBlockEntity(pos);
             be.setItem(26, new ItemStack(BuiltInRegistries.ITEM.getValue(Identifier.parse("minecraft:dirt")), 23));
         });
-        openShulker(ctx, sp, pos);
+        clickBlock(ctx, pos);
+        ctx.waitForScreen(ShulkerBoxScreen.class);
+        ctx.waitTicks(10);
+        shot(ctx, "08_packing_assistant_unlinked");
+        ctx.runOnClient(mc -> it.marco.shulkerplanner.render.PackingAssistant.linkOpenBox(
+                PlannerSession.INSTANCE.getPlan().getBoxes().get(focus)));
+        ctx.waitTicks(3);
         shot(ctx, "08_packing_assistant");
         ctx.runOnClient(mc -> mc.player.closeContainer());
 
@@ -811,6 +818,229 @@ public class ShulkerPlannerClientGameTest implements FabricClientGameTest
         shot(ctx, "10_config");
 
         ctx.runOnClient(mc -> mc.gui.setScreen(null));
+    }
+
+    // ------------------------------------------------------------------ manual links, picked up and placed again
+
+    /**
+     * The problems of 1.x: opening a new shulker box changed the box being filled, and the plan changed under
+     * the player's feet. Now a shulker box is only linked by hand, the link survives breaking and placing it
+     * somewhere else, and a locked plan never changes on its own.
+     */
+    private void linkingChecks(ClientGameTestContext ctx, TestSingleplayerContext sp)
+    {
+        sp.getServer().runCommand("clear @a");
+        TestMaterialList list = ctx.computeOnClient(mc -> new TestMaterialList("GameTest Links", List.of(
+                entry("stone_bricks", 27 * 64 + 640, 27 * 64 + 640),
+                entry("glass", 300, 300),
+                entry("oak_stairs", 100, 100))));
+
+        ctx.runOnClient(mc -> {
+            Configs.Generic.AUTO_LINK_OPENED_BOXES.setBooleanValue(false);
+            PlannerGuis.openForMaterialList(list, null);
+        });
+        ctx.waitTicks(10);
+        ctx.runOnClient(mc -> GuiBase.openGui(null));
+        ctx.waitTicks(5);
+
+        String planBefore = ctx.computeOnClient(mc -> describePlan());
+        int boxCount = ctx.computeOnClient(mc -> PlannerSession.INSTANCE.getPlan().getBoxCount());
+        log("Links: plan %s", planBefore);
+        check(boxCount == 2, "the links test plan should have 2 boxes, has " + boxCount);
+        check(ctx.computeOnClient(mc -> PlannerSession.INSTANCE.isPlanLocked()) == false, "a new plan is a draft");
+
+        BlockPos a = sp.getServer().computeOnServer(server -> {
+            ServerPlayer player = server.getPlayerList().getPlayers().getFirst();
+            BlockPos p = player.blockPosition().offset(2, 0, 0);
+            player.level().setBlock(p, net.minecraft.world.level.block.Blocks.DYED_SHULKER_BOX.pick(net.minecraft.world.item.DyeColor.PURPLE).defaultBlockState(), 3);
+            player.level().setBlock(p.offset(0, 0, 2), net.minecraft.world.level.block.Blocks.DYED_SHULKER_BOX.pick(net.minecraft.world.item.DyeColor.PURPLE).defaultBlockState(), 3);
+            return p;
+        });
+        BlockPos b = a.offset(0, 0, 2);
+        ctx.waitTicks(5);
+
+        // 1. Opening a shulker box links nothing and changes nothing
+        clickBlock(ctx, a);
+        ctx.waitForScreen(ShulkerBoxScreen.class);
+        ctx.waitTicks(10);
+        ctx.runOnClient(mc -> {
+            PlannerSession session = PlannerSession.INSTANCE;
+            check(session.getProject().getBindings().isEmpty(), "opening a shulker box must not link it");
+            check(session.isPlanLocked() == false, "opening a shulker box must not lock the plan");
+            check(describePlan().equals(planBefore), "opening a shulker box must not change the plan");
+        });
+        shot(ctx, "check_link_unlinked");
+
+        // 2. Link it by hand to box #2
+        ctx.runOnClient(mc -> it.marco.shulkerplanner.render.PackingAssistant.linkOpenBox(PlannerSession.INSTANCE.getPlan().getBoxes().get(1)));
+        ctx.waitTicks(2);
+        ctx.runOnClient(mc -> {
+            PlannerSession session = PlannerSession.INSTANCE;
+            PlannedBox box2 = session.getPlan().getBoxes().get(1);
+            it.marco.shulkerplanner.data.ShulkerBinding binding = session.getBinding(box2);
+            check(binding != null, "box #2 should be linked");
+            check(binding.isAt(mc.level.dimension().identifier().toString(), a), "the link should know the position " + a + ", has " + binding.getPos());
+            check(session.isPlanLocked(), "linking locks the plan");
+            check(session.getBoxState(box2) == it.marco.shulkerplanner.plan.BoxState.FILLING, "a linked box is being filled");
+        });
+
+        // Put half of box #2 in
+        List<ItemStack> box2Stacks = ctx.computeOnClient(mc -> PlannerSession.INSTANCE.getPlan().getBoxes().get(1).getSlots().stream().map(PlannedStack::createStack).toList());
+        fillShulker(sp, a, box2Stacks, 0, box2Stacks.size() / 2);
+        ctx.waitTicks(10);
+        shot(ctx, "check_link_linked");
+        ctx.runOnClient(mc -> mc.player.closeContainer());
+        ctx.waitTicks(5);
+
+        int current = ctx.computeOnClient(mc -> PlannerSession.INSTANCE.getCurrentBox().getIndex());
+        check(current == 2, "the linked box being filled should be the current box, is #" + current);
+
+        // 3. Another new shulker box: still nothing changes, the current box stays #2
+        clickBlock(ctx, b);
+        ctx.waitForScreen(ShulkerBoxScreen.class);
+        ctx.waitTicks(10);
+        ctx.runOnClient(mc -> mc.player.closeContainer());
+        ctx.waitTicks(5);
+        ctx.runOnClient(mc -> {
+            PlannerSession session = PlannerSession.INSTANCE;
+            check(session.getProject().getBindings().size() == 1, "the second shulker box must not be linked");
+            check(session.getCurrentBox().getIndex() == 2, "opening another shulker box must not change the current box");
+            check(describePlan().equals(planBefore), "the plan must stay the same");
+        });
+
+        // 4. Break box A (picked up with its contents): the link follows the item
+        sp.getServer().runOnServer(server -> {
+            ServerPlayer player = server.getPlayerList().getPlayers().getFirst();
+            ShulkerBoxBlockEntity be = (ShulkerBoxBlockEntity) player.level().getBlockEntity(a);
+            List<ItemStack> items = new ArrayList<>();
+
+            for (int i = 0; i < be.getContainerSize(); ++i)
+            {
+                items.add(be.getItem(i).copy());
+            }
+
+            ItemStack item = new ItemStack(net.minecraft.world.item.Items.DYED_SHULKER_BOX.pick(net.minecraft.world.item.DyeColor.PURPLE));
+            item.set(DataComponents.CONTAINER, ItemContainerContents.fromItems(items));
+            be.clearContent();
+            player.level().removeBlock(a, false);
+            player.getInventory().setSelectedSlot(0);
+            player.getInventory().setItem(0, item);
+        });
+        ctx.waitTicks(30);
+        ctx.runOnClient(mc -> {
+            PlannerSession session = PlannerSession.INSTANCE;
+            it.marco.shulkerplanner.data.ShulkerBinding binding = session.getBinding(session.getPlan().getBoxes().get(1));
+            check(binding != null && binding.isPlaced() == false, "the picked up box should be carried");
+            check(session.getCurrentBox().getIndex() == 2, "picking the box up must not change the current box");
+            check(session.getProgress(session.getPlan().getBoxes().get(1)).getInBox() > 0, "the carried box keeps its progress");
+        });
+
+        // 5. Place it somewhere else, like a player does
+        BlockPos c = a.offset(0, 0, -2);
+        ctx.runOnClient(mc -> mc.player.getInventory().setSelectedSlot(0));
+        ctx.waitTicks(5);
+        clickBlock(ctx, c.below(), net.minecraft.core.Direction.UP);
+        ctx.waitTicks(20);
+        boolean placed = sp.getServer().computeOnServer(server -> server.getPlayerList().getPlayers().getFirst().level()
+                .getBlockState(c).getBlock() instanceof net.minecraft.world.level.block.ShulkerBoxBlock);
+        check(placed, "the shulker box should have been placed at " + c);
+        ctx.runOnClient(mc -> {
+            PlannerSession session = PlannerSession.INSTANCE;
+            it.marco.shulkerplanner.data.ShulkerBinding binding = session.getBinding(session.getPlan().getBoxes().get(1));
+            log("Links: after placing again, link at %s", binding != null ? binding.getPos() : null);
+            check(binding != null && c.equals(binding.getPos()), "the link should follow the placed box to " + c);
+        });
+
+        clickBlock(ctx, c);
+        ctx.waitForScreen(ShulkerBoxScreen.class);
+        ctx.waitTicks(10);
+        shot(ctx, "check_link_moved");
+
+        // Finish filling it: marked done on its own
+        fillShulker(sp, c, box2Stacks, 0, box2Stacks.size());
+        ctx.waitTicks(10);
+        ctx.runOnClient(mc -> mc.player.closeContainer());
+        ctx.waitTicks(5);
+        ctx.runOnClient(mc -> {
+            PlannerSession session = PlannerSession.INSTANCE;
+            check(session.isBoxDone(session.getPlan().getBoxes().get(1)), "the filled linked box should be done");
+        });
+
+        // 6. The material list changes: the locked plan stays, the player decides when to update it
+        TestMaterialList changed = ctx.computeOnClient(mc -> new TestMaterialList("GameTest Links", List.of(
+                entry("stone_bricks", 27 * 64 + 640, 27 * 64 + 100),
+                entry("glass", 300, 300),
+                entry("oak_stairs", 100, 100),
+                entry("lantern", 20, 20))));
+        ctx.runOnClient(mc -> {
+            PlannerGuis.openForMaterialList(changed, null);
+            GuiBase.openGui(null);
+        });
+        ctx.waitTicks(5);
+        ctx.runOnClient(mc -> {
+            PlannerSession session = PlannerSession.INSTANCE;
+            check(describePlan().equals(planBefore), "a locked plan must not change when the material list changes");
+            check(session.isPlanOutdated(), "the plan should be marked as outdated");
+            String box2 = session.getPlan().getBoxes().get(1).getSignature();
+            session.updateLockedPlan();
+            check(session.getPlan().getBoxes().stream().anyMatch(bx -> bx.getIndex() == 2 && bx.getSignature().equals(box2)),
+                  "updating the plan must keep the started box #2 as it is");
+            check(session.isPlanOutdated() == false, "the updated plan is up to date");
+            check(session.getBinding(session.getPlan().getBoxById(2)) != null || session.getProject().getBindings().size() == 1, "the link stays");
+            log("Links: updated plan %s", describePlan());
+        });
+
+        // 7. Raw materials: stone bricks become cobblestone (stone from the furnace)
+        ctx.runOnClient(mc -> {
+            PlannerSession session = PlannerSession.INSTANCE;
+            var raw = session.getRawResult();
+            log("Links: raw materials %s", raw.raw());
+            check(raw.raw().containsKey("minecraft:cobblestone"), "stone bricks should need cobblestone");
+            check(raw.raw().containsKey("minecraft:stone_bricks") == false, "stone bricks are crafted, not raw");
+            session.resetPlan();
+            session.getProject().setPackRawMaterials(true);
+            session.onPackingOptionsChanged();
+            check(session.getPlan().getPackedTotals().containsKey("minecraft:cobblestone"), "packing raw materials should pack cobblestone");
+            session.getProject().setPackRawMaterials(false);
+            session.onPackingOptionsChanged();
+        });
+
+        sp.getServer().runOnServer(server -> {
+            ServerPlayer player = server.getPlayerList().getPlayers().getFirst();
+            player.level().removeBlock(b, false);
+            player.level().removeBlock(c, false);
+        });
+        sp.getServer().runCommand("clear @a");
+        ctx.waitTicks(5);
+        log("Links: all checks passed");
+    }
+
+    private static String describePlan()
+    {
+        StringBuilder sb = new StringBuilder();
+
+        for (PlannedBox box : PlannerSession.INSTANCE.getPlan().getBoxes())
+        {
+            sb.append('#').append(box.getIndex()).append('[').append(box.getSignature()).append("] ");
+        }
+
+        return sb.toString();
+    }
+
+    private static void clickBlock(ClientGameTestContext ctx, BlockPos pos)
+    {
+        clickBlock(ctx, pos, net.minecraft.core.Direction.UP);
+    }
+
+    /**
+     * A real right click from the client, like the player does
+     */
+    private static void clickBlock(ClientGameTestContext ctx, BlockPos pos, net.minecraft.core.Direction face)
+    {
+        ctx.runOnClient(mc -> {
+            var hit = new net.minecraft.world.phys.BlockHitResult(net.minecraft.world.phys.Vec3.atCenterOf(pos), face, pos, false);
+            mc.gameMode.useItemOn(mc.player, net.minecraft.world.InteractionHand.MAIN_HAND, hit);
+        });
     }
 
     // ------------------------------------------------------------------ helpers

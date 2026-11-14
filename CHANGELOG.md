@@ -2,20 +2,32 @@
 
 ## 2.0.0 - Minecraft 26.3
 
-- **Fixed material calculations and progress tracking:**
-  - Respects Litematica's ignored blocks (`respectLitematicaIgnored`), correctly counts items inside carried shulker boxes and bundles (`autoDetectInventoryBoxes`), and separates **Needed**, **Packed**, **Carrying**, and **To get** columns.
-  - Plans can now be **Locked** so phases and IDs stay fixed when Litematica's material list changes, with an **Update plan** banner and rebase logic (`PlanRebaser`) that preserves started/linked boxes.
-- **Manual shulker box linking & persistent tracking:**
-  - Opening a new shulker box no longer auto-links or resets work-in-progress boxes (`autoLinkOpenedBoxes` is off by default).
-  - Link/unlink any shulker box manually to a specific phase in the packing assistant (`+ Link to #N` / `Unlink`).
-  - Linked boxes stay tracked even when broken, carried in the inventory, and placed again elsewhere (`ShulkerTracker`).
-- **Raw source materials mode (`Raw materials` tab):**
-  - Recursively breaks down blocks into raw source resources and ordered crafting/smelting/stonecutting/smithing steps (using world recipes in singleplayer or vanilla recipes on multiplayer).
-  - Toggle furnace smelting and stonecutter usage, cycle alternative recipes per item, mark intermediates as **Keep base**, or switch the box planner to pack raw source materials directly (**Pack raw items**).
-- **Configurable warnings & highlights (`Settings` tab):**
-  - Every warning and slot highlight (panel wrong items, red wrong slots, yellow overfilled slots, green items to move, unlinked preview, HUD wrong items, unlinked hint, completion notification, outdated plan banner) can be toggled individually or all at once.
-- **Complete UI/UX overhaul:**
-  - Modern dark-purple theme with unified sidebar navigation, header progress bar, status chips (`LOCKED` / `DRAFT` / `RAW`), flat buttons, compact responsive mode, and redesigned packing assistant panel.
+**Correct numbers**
+- The plan no longer changes on its own. As soon as you start working on it (mark a box, link a shulker box) or press *Lock plan*, the boxes keep their number and contents. When the material list changes, a banner tells you what changed and *Update plan* repacks only the boxes you haven't started.
+- Fixed the counts shrinking while packing: the old *To gather* mode subtracted the items already packed in your boxes from the plan itself, so boxes were renumbered and their state was lost. The plan is now made from *Total* or *Missing* only.
+- The Materials tab shows, for every material: **Needed**, **Packed** (in boxes done or being filled), **Carrying** (inventory, bundles and shulker boxes not linked to the plan) and **To get**, with a progress bar. Nothing is counted twice.
+- With a multiplier, the copy you're building counts what's missing and the other copies count in full (before, the missing counts were ignored).
+- Entries hidden ("ignored") in Litematica's material list are left out (can be turned off).
+
+**Shulker boxes linked by hand**
+- Opening a shulker box doesn't change anything anymore: no box is picked for you, the HUD doesn't jump, nothing gets reset.
+- The packing assistant shows a preview of the suggested box; choose the box with ◀ ▶ and press *Link*. From then on that shulker box *is* that box.
+- The link stays when you break the shulker box, carry it around and place it somewhere else: it's recognised by color, name and contents, and the new position is taken over.
+- A linked box being filled is shown on the HUD with what's already inside, and marked done when it matches the plan. *Unlink*, *Mark done* and *Follow on HUD* are on the panel and on every box card.
+- The old automatic behaviour is still available with *Auto-link opened boxes* (off by default).
+
+**Raw materials**
+- New *Raw materials* page: everything on the material list broken down into what you have to gather (cobblestone, logs, sand, raw iron...), with every crafting step in order: how many crafts, at which station, which ingredients, leftovers.
+- Recipes come from the world in singleplayer (data packs and mods included) and from the game on servers.
+- Turn furnace and stonecutter recipes on or off, pick another recipe for an item, or keep an item as it is instead of breaking it down.
+- *Pack raw items* plans the shulker boxes with the raw materials instead of the finished blocks.
+
+**Warnings you can turn off**
+- New *Settings* page with every warning and highlight on its own switch: items to remove, red/orange/green slot highlights, highlights on unlinked boxes, HUD wrong items, the unlinked box hint, the "box complete" message, the outdated plan banner. Plus *Enable all* / *Disable all*. They are also in the configuration screen, in the new *Warnings* category.
+
+**New look**
+- New planner layout: header with the overall progress and the plan state (Draft / Locked / Raw), side bar with the pages, toolbars with the main options first and *More options* for the rest, flat buttons and switches, cards for the boxes with a colored state stripe and a state label, progress bars everywhere.
+- Redesigned packing assistant panel. Every state uses a color *and* a label or icon.
 
 ## 1.2.0 - Minecraft 26.3
 

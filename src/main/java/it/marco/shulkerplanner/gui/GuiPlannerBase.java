@@ -486,17 +486,6 @@ public abstract class GuiPlannerBase<TYPE, WIDGET extends WidgetListEntryBase<TY
             }
         }
 
-        // Page title in the content area
-        if (this.isCompact() == false)
-        {
-            String source = project != null && project.getSourceTitle().isEmpty() == false ? project.getSourceTitle() : "";
-            int y = this.getScreenHeight() - BOTTOM_HEIGHT - 2 * (FlatButton.HEIGHT + 4) - 10;
-            if (source.isEmpty() == false && this.session.getMaterialList() != null)
-            {
-                Ui.text(ctx, Ui.trim(StringUtils.translate("shulkerplanner.gui.label.source"), this.sidebarWidth - 10), 6, y - 10, Theme.TEXT_MUTED);
-                Ui.text(ctx, Ui.trim(source, this.sidebarWidth - 10), 6, y, Theme.TEXT_DIM);
-            }
-        }
     }
 
     @Override

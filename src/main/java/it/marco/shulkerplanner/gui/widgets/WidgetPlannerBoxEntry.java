@@ -228,7 +228,7 @@ public class WidgetPlannerBoxEntry extends WidgetListEntryBase<PlannedBox>
 
         if (state == BoxState.DONE)
         {
-            chip = "✔ " + StringUtils.translate("shulkerplanner.gui.label.box.status_done");
+            chip = StringUtils.translate("shulkerplanner.gui.label.box.status_done");
         }
         else if (inInventory)
         {
@@ -257,7 +257,7 @@ public class WidgetPlannerBoxEntry extends WidgetListEntryBase<PlannedBox>
         }
         else
         {
-            Ui.text(ctx, StringUtils.translate("shulkerplanner.gui.label.box.not_linked"), ix, iy + 37, Theme.TEXT_MUTED);
+            Ui.text(ctx, Ui.trim(StringUtils.translate("shulkerplanner.gui.label.box.not_linked"), INFO_WIDTH - 10), ix, iy + 37, Theme.TEXT_MUTED);
         }
 
         // Slot grid: tinted by what's already inside the linked box

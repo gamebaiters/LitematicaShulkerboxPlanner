@@ -321,7 +321,7 @@ t("gui.button.reset_recipes", "Ripristina ricette", "Reset recipes")
 t("gui.button.reset_recipes.hover", "Ripristina le scelte predefinite delle ricette\ne gli item tenuti come base", "Resets custom recipe choices and kept base items")
 t("gui.button.break_down", "Scomponi", "Break down")
 t("gui.button.break_down.hover", "Torna a scomporre questo item nei suoi ingredienti", "Break this item down into its ingredients again")
-t("gui.button.keep_item", "Tieni base", "Keep base")
+t("gui.button.keep_item", "Non scomporre", "Keep as is")
 t("gui.button.keep_item.hover", "Considera questo item come risorsa di partenza\nsenza scomporlo ulteriormente", "Treat this item as a raw resource without breaking it down")
 t("gui.button.recipe", "Ricetta %s/%s", "Recipe %s/%s")
 t("gui.button.recipe.hover", "Clic per cambiare ricetta di crafting per questo item", "Click to cycle the crafting recipe for this item")
@@ -333,7 +333,7 @@ t("gui.button.warnings_all_off.hover", "Disattiva tutti gli avvisi di item sbagl
 t("gui.button.open_hotkeys", "Hotkey e Config completo", "Hotkeys & Full Config")
 t("gui.button.open_hotkeys.hover", "Apre la schermata MaLiLib con tutte le scorciatoie da tastiera", "Opens the MaLiLib screen with all keybinds")
 
-t("gui.label.box.not_linked", "Nessuna shulker collegata", "No shulker box linked")
+t("gui.label.box.not_linked", "Non collegata", "Not linked")
 t("gui.label.box.status_filling", "In corso", "Filling")
 t("gui.label.boxes.empty_list", "Nessuna shulker da mostrare per questo filtro", "No boxes to show for this filter")
 t("gui.hover.box.linked", "Collegata: %s", "Linked: %s")
@@ -354,7 +354,7 @@ t("gui.label.raw.have", "Hai: %s", "Have: %s")
 t("gui.label.raw.leftover", "Avanzo: %s", "Leftover: %s")
 t("gui.label.raw.summary1", "%s risorse sorgente (%s item totali) · %s passi di crafting", "%s raw resources (%s total items) · %s crafting steps")
 t("gui.label.raw.summary_packing_raw", "Modalità attiva: le shulker contengono le materie prime (%s shulker).", "Active mode: boxes are packed with raw materials (%s boxes).")
-t("gui.label.raw.summary_packing_listed", "Modalità attiva: le shulker contengono i blocchi finali (%s shulker).", "Active mode: boxes are packed with final blocks (%s boxes).")
+t("gui.label.raw.summary_packing_listed", "Modalità attiva: le shulker contengono i blocchi finali (%s oggetti).", "Active mode: boxes are packed with final blocks (%s items).")
 t("gui.hover.raw.raw", "Totale da procurare: %s", "Total needed: %s")
 t("gui.hover.raw.step", "Servono %s · %s craft (x%s = %s prodotti)", "Need %s · %s crafts (x%s = %s produced)")
 t("gui.hover.raw.any_of", "uno tra %s", "any of %s")
@@ -374,8 +374,8 @@ t("assistant.state.linked", "Collegata", "Linked")
 t("assistant.state.preview", "Anteprima", "Preview")
 t("assistant.to_put_in", "Da inserire: %s", "Put in: %s")
 t("assistant.too_many", "In eccesso: +%s", "Extra: +%s")
-t("assistant.hint_unlinked1", "Shulker non collegata a nessuna fase", "Shulker box not linked to any phase")
-t("assistant.hint_unlinked2", "Scegli una fase con ◀ ▶ e premi Collega", "Pick a phase with ◀ ▶ and click Link")
+t("assistant.hint_unlinked1", "Non collegata a una fase", "Not linked to a phase")
+t("assistant.hint_unlinked2", "Scegli con ◀ ▶, poi Collega", "Pick with ◀ ▶, then Link")
 t("assistant.link", "Collega a #%s", "Link to #%s")
 t("assistant.unlink", "Scollega", "Unlink")
 t("assistant.mark_done", "Segna pronta", "Mark done")
@@ -393,7 +393,7 @@ t("hotkeys.category.generic", "Hotkey", "Hotkeys")
 
 configs = {
     "generic": [
-        ("hudEnabled", "HUD promemoria", "Reminder HUD", "Mostra a schermo il progetto attivo, il progresso\ne i promemoria aperti", "Shows the active project, the progress\nand the open reminders on screen"),
+        ("hudEnabled", "HUD", "HUD", "Mostra a schermo il progetto attivo, il progresso\ne i promemoria aperti", "Shows the active project, the progress\nand the open reminders on screen"),
         ("hudFollowSelectedPlacement", "HUD segue il placement", "HUD follows placement", "Quando selezioni un placement di Litematica che ha già un progetto,\nl'HUD passa a quella schematica", "When you select a Litematica placement that already has a project,\nthe HUD switches to that schematic"),
         ("hudFollowOpenedBox", "HUD segue shulker aperta", "HUD follows opened box", "Quando apri una shulker collegata al piano,\nl'HUD mostra automaticamente quella fase", "When you open a shulker box linked to the plan,\nthe HUD automatically shows that box"),
         ("packingAssistant", "Assistente riempimento", "Packing assistant", "Quando apri una shulker box mostra a lato cosa\ndeve contenere secondo il piano", "When opening a shulker box, shows next to it\nwhat it should contain according to the plan"),
