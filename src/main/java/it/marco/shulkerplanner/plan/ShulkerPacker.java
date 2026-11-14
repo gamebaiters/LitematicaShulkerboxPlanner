@@ -22,6 +22,14 @@ public class ShulkerPacker
                       .thenComparing(PlannedStack::item, ITEM_ORDER)
                       .thenComparing(Comparator.comparingInt(PlannedStack::count).reversed());
 
+    /**
+     * Packs the requirements into boxes, see {@link #pack}, and returns only the boxes (ids and numbers 1..n).
+     */
+    public static List<PlannedBox> packBoxes(List<ItemRequirement> input, PackMode mode, boolean roundUpStacks, boolean fillSpare)
+    {
+        return pack(input, mode, roundUpStacks, fillSpare).getBoxes();
+    }
+
     public static ShulkerPlan pack(List<ItemRequirement> input, PackMode mode, boolean roundUpStacks, boolean fillSpare)
     {
         List<ItemRequirement> boxable = new ArrayList<>();
@@ -76,6 +84,7 @@ public class ShulkerPacker
         {
             PlannedBox box = new PlannedBox(slots);
             box.setIndex(result.size() + 1);
+            box.setId(result.size() + 1);
             box.setDuplicateOrdinal(duplicates.merge(box.getSignature(), 1, Integer::sum) - 1);
             result.add(box);
         }

@@ -29,7 +29,7 @@ public class WidgetListPlannerBoxes extends WidgetListBase<PlannedBox, WidgetPla
 
         this.gui = gui;
         this.browserEntryHeight = WidgetPlannerBoxEntry.HEIGHT;
-        this.widgetSearchBar = new WidgetSearchBar(x + 2, y + 4, width - 16, 14, 0, Icons.FILE_ICON_SEARCH, LeftRight.RIGHT);
+        this.widgetSearchBar = new WidgetSearchBar(x + 2, y + 2, width - 16, 14, 0, Icons.FILE_ICON_SEARCH, LeftRight.RIGHT);
         this.widgetSearchBar.setZLevel(1);
         // Space for the search bar above the first entry
         this.browserEntriesOffsetY = 18;
@@ -76,13 +76,19 @@ public class WidgetListPlannerBoxes extends WidgetListBase<PlannedBox, WidgetPla
     @Override
     public void drawContents(GuiContext ctx, int mouseX, int mouseY, float partialTicks)
     {
+        if (this.listContents.isEmpty())
+        {
+            it.marco.shulkerplanner.gui.ui.Ui.textCentered(ctx, StringUtils.translate("shulkerplanner.gui.label.boxes.empty_list"),
+                                                           this.posX + this.totalWidth / 2, this.posY + 40, it.marco.shulkerplanner.gui.ui.Theme.TEXT_MUTED);
+        }
+
         super.drawContents(ctx, mouseX, mouseY, partialTicks);
         lastScrollbarPosition = this.scrollBar.getValue();
 
         if (this.widgetSearchBar != null && this.widgetSearchBar.isSearchOpen() == false)
         {
             String hint = GuiBase.TXT_DARK_GRAY + StringUtils.translate("shulkerplanner.gui.label.type_to_search");
-            this.drawString(ctx, hint, this.posX + 4, this.posY + 7, 0xFFFFFFFF);
+            this.drawString(ctx, hint, this.posX + 4, this.posY + 5, 0xFFFFFFFF);
         }
     }
 

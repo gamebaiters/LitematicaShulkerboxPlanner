@@ -32,6 +32,12 @@ public abstract class MixinAbstractContainerScreen
                                 this.leftPos, this.topPos, this.imageWidth, this.imageHeight);
     }
 
+    @Inject(method = "removed", at = @At("HEAD"))
+    private void shulkerplanner_onRemoved(CallbackInfo ci)
+    {
+        PackingAssistant.onScreenClosed();
+    }
+
     @Inject(method = "mouseClicked", at = @At("HEAD"), cancellable = true)
     private void shulkerplanner_onMouseClicked(MouseButtonEvent event, boolean doubleClick, CallbackInfoReturnable<Boolean> cir)
     {

@@ -6,7 +6,7 @@ import java.util.List;
 import fi.dy.masa.malilib.gui.GuiBase;
 import fi.dy.masa.malilib.gui.GuiTextFieldInteger;
 import fi.dy.masa.malilib.gui.Message.MessageType;
-import fi.dy.masa.malilib.gui.button.ButtonGeneric;
+import it.marco.shulkerplanner.gui.ui.FlatButton;
 import fi.dy.masa.malilib.util.StringUtils;
 import fi.dy.masa.malilib.util.input.ScanCodes;
 
@@ -31,6 +31,8 @@ public class GuiPlannerMaterials extends GuiPlannerBase<MaterialRow, WidgetPlann
         return new WidgetListPlannerMaterials(listX, listY, this.getBrowserWidth(), this.getBrowserHeight(), this);
     }
 
+    private static boolean showMoreOptions;
+
     @Override
     protected void createOptionButtons()
     {
@@ -41,10 +43,10 @@ public class GuiPlannerMaterials extends GuiPlannerBase<MaterialRow, WidgetPlann
             return;
         }
 
-        ButtonGeneric button = this.createValueButton("shulkerplanner.gui.button.count_mode", project.getCountMode().getDisplayName(), project.getCountMode().getHoverText());
+        FlatButton button = this.createValueButton("shulkerplanner.gui.button.count_mode", project.getCountMode().getDisplayName(), project.getCountMode().getHoverText());
         this.addFlowButton(button, (btn, mb) -> {
             project.setCountMode(project.getCountMode().cycle(mb == ScanCodes.OFFSET_MOUSE_LEFT));
-            this.onProjectChanged();
+            this.onPackingOptionsChanged();
         });
 
         button = this.createValueButton("shulkerplanner.gui.button.sort", project.getMaterialSort().getDisplayName(), null);
@@ -53,7 +55,7 @@ public class GuiPlannerMaterials extends GuiPlannerBase<MaterialRow, WidgetPlann
             this.onProjectChanged();
         });
 
-        button = this.createOnOffButton("shulkerplanner.gui.button.hide_excluded", project.getHideExcluded(), null);
+        button = this.createToggle("shulkerplanner.gui.button.hide_excluded", project.getHideExcluded(), null);
         this.addFlowButton(button, (btn, mb) -> {
             project.setHideExcluded(! project.getHideExcluded());
             this.onProjectChanged();
@@ -68,7 +70,7 @@ public class GuiPlannerMaterials extends GuiPlannerBase<MaterialRow, WidgetPlann
                 if (value != project.getMultiplier() && value > 0)
                 {
                     project.setMultiplier(value);
-                    this.session.onProjectChanged();
+                    this.session.onPackingOptionsChanged();
                     if (this.getListWidget() != null)
                     {
                         this.getListWidget().refreshEntries();
@@ -81,23 +83,35 @@ public class GuiPlannerMaterials extends GuiPlannerBase<MaterialRow, WidgetPlann
         });
         tf.setValueWrapper(String.valueOf(project.getMultiplier()));
 
-        button = new ButtonGeneric(0, 0, -1, 20, StringUtils.translate("shulkerplanner.gui.button.include_all"));
+        button = new FlatButton(0, 0, -1, (showMoreOptions ? "▴ " : "▾ ") + StringUtils.translate("shulkerplanner.gui.button.more_options"), FlatButton.Style.GHOST);
         this.addFlowButton(button, (btn, mb) -> {
-            project.clearExcluded();
-            this.onProjectChanged();
+            showMoreOptions = ! showMoreOptions;
+            this.initGui();
         });
 
-        button = new ButtonGeneric(0, 0, -1, 20, StringUtils.translate("shulkerplanner.gui.button.exclude_all"));
+        if (showMoreOptions == false)
+        {
+            return;
+        }
+
+        this.newFlowRow();
+
+        button = this.createAction("shulkerplanner.gui.button.include_all", null);
+        this.addFlowButton(button, (btn, mb) -> {
+            project.clearExcluded();
+            this.onPackingOptionsChanged();
+        });
+
+        button = this.createAction("shulkerplanner.gui.button.exclude_all", null);
         this.addFlowButton(button, (btn, mb) -> {
             for (MaterialRow row : project.getMaterials())
             {
                 project.setExcluded(row.getId(), true);
             }
-            this.onProjectChanged();
+            this.onPackingOptionsChanged();
         });
 
-        button = new ButtonGeneric(0, 0, -1, 20, StringUtils.translate("shulkerplanner.gui.button.exclude_gathered"),
-                                   StringUtils.translate("shulkerplanner.gui.button.exclude_gathered.hover"));
+        button = this.createAction("shulkerplanner.gui.button.exclude_gathered", StringUtils.translate("shulkerplanner.gui.button.exclude_gathered.hover"));
         this.addFlowButton(button, (btn, mb) -> {
             for (MaterialRow row : project.getMaterials())
             {
@@ -106,11 +120,10 @@ public class GuiPlannerMaterials extends GuiPlannerBase<MaterialRow, WidgetPlann
                     project.setExcluded(row.getId(), true);
                 }
             }
-            this.onProjectChanged();
+            this.onPackingOptionsChanged();
         });
 
-        button = new ButtonGeneric(0, 0, -1, 20, StringUtils.translate("shulkerplanner.gui.button.notes_for_missing"),
-                                   StringUtils.translate("shulkerplanner.gui.button.notes_for_missing.hover"));
+        button = this.createAction("shulkerplanner.gui.button.notes_for_missing", StringUtils.translate("shulkerplanner.gui.button.notes_for_missing.hover"));
         this.addFlowButton(button, (btn, mb) -> {
             int added = this.addRemindersForMissing(project);
             this.addMessage(MessageType.SUCCESS, 3000, "shulkerplanner.message.reminders_added", added);
@@ -125,7 +138,7 @@ public class GuiPlannerMaterials extends GuiPlannerBase<MaterialRow, WidgetPlann
         for (MaterialRow row : project.getMaterials())
         {
             String id = row.getId();
-            int count = project.getRequiredCount(row);
+            int count = (int) Math.min(Integer.MAX_VALUE, this.getStillToGet(id));
 
             if (project.isExcluded(id) || project.isGathered(id) || count <= 0 || project.hasReminderFor(id))
             {
@@ -138,6 +151,23 @@ public class GuiPlannerMaterials extends GuiPlannerBase<MaterialRow, WidgetPlann
         }
 
         return added;
+    }
+
+    /**
+     * @return how many of the item still have to be gathered: needed minus packed minus carried
+     */
+    public long getStillToGet(String id)
+    {
+        WidgetListPlannerMaterials list = this.getListWidget();
+
+        if (list != null)
+        {
+            return list.getLayout().stillToGet(id);
+        }
+
+        long need = this.session.getListedCounts().getOrDefault(id, 0L);
+        long have = this.session.getPackedCounts().getOrDefault(id, 0L) + this.session.getCarryingCounts().getOrDefault(id, 0L);
+        return Math.max(0, need - have);
     }
 
     @Override
@@ -153,18 +183,24 @@ public class GuiPlannerMaterials extends GuiPlannerBase<MaterialRow, WidgetPlann
 
         int total = project.getMaterials().size();
         int excluded = project.getExcludedCount();
-        int gathered = 0;
+        int complete = 0;
+        int included = 0;
 
         for (MaterialRow row : project.getMaterials())
         {
-            if (project.isGathered(row.getId()) && project.isExcluded(row.getId()) == false)
+            if (project.isExcluded(row.getId()) == false && this.session.isIgnoredInLitematica(row.getId()) == false)
             {
-                ++gathered;
+                ++included;
+
+                if (project.isGathered(row.getId()) || this.getStillToGet(row.getId()) <= 0)
+                {
+                    ++complete;
+                }
             }
         }
 
         ShulkerPlan plan = this.session.getPlan();
-        lines.add(StringUtils.translate("shulkerplanner.gui.label.materials.summary1", total - excluded, total, gathered, total - excluded));
+        lines.add(StringUtils.translate("shulkerplanner.gui.label.materials.summary1", included, total, complete, included));
         lines.add(GuiBase.TXT_GRAY + StringUtils.translate("shulkerplanner.gui.label.materials.summary2",
                                                            Format.number(plan.getTotalItems()), plan.getTotalStacks(), plan.getBoxCount()));
 

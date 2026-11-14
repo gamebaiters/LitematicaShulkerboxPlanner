@@ -280,9 +280,13 @@ public class HudRenderer implements IRenderer
             segs.add(Seg.of(StringUtils.translate("shulkerplanner.hud.current_box", box.getIndex(), plan.getBoxCount()), HudColor.INFO));
             segs.add(Seg.of("  " + type, HudColor.LABEL));
 
-            if (progress.isContentsKnown())
+            if (session.getBinding(box) != null)
             {
-                segs.add(Seg.of("  ● " + StringUtils.translate("shulkerplanner.hud.live"), HudColor.GOOD));
+                segs.add(Seg.of("  ● " + StringUtils.translate("shulkerplanner.hud.linked"), HudColor.GOOD));
+            }
+            else if (session.isFollowed(box))
+            {
+                segs.add(Seg.of("  ◉ " + StringUtils.translate("shulkerplanner.hud.followed"), HudColor.INFO));
             }
 
             elements.add(new Line(lay, null, segs));
@@ -335,7 +339,7 @@ public class HudRenderer implements IRenderer
             }
         }
 
-        if (style.isShown(HudElement.WRONG_ITEMS))
+        if (style.isShown(HudElement.WRONG_ITEMS) && Configs.Warnings.HUD_WRONG_ITEMS.getBooleanValue())
         {
             for (Map.Entry<String, Integer> e : progress.getExtra().entrySet())
             {

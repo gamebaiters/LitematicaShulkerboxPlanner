@@ -3,17 +3,22 @@ package it.marco.shulkerplanner.gui;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import javax.annotation.Nullable;
 
 import net.minecraft.world.item.DyeColor;
 
 import fi.dy.masa.malilib.gui.GuiBase;
 import fi.dy.masa.malilib.gui.Message.MessageType;
-import fi.dy.masa.malilib.gui.button.ButtonGeneric;
 import fi.dy.masa.malilib.util.StringUtils;
 import fi.dy.masa.malilib.util.input.ScanCodes;
 
+import it.marco.shulkerplanner.config.Configs;
+import it.marco.shulkerplanner.data.MaterialRow;
 import it.marco.shulkerplanner.data.PlannerProject;
 import it.marco.shulkerplanner.data.ProjectStorage;
+import it.marco.shulkerplanner.gui.ui.FlatButton;
+import it.marco.shulkerplanner.gui.ui.Theme;
 import it.marco.shulkerplanner.gui.widgets.WidgetListPlannerBoxes;
 import it.marco.shulkerplanner.gui.widgets.WidgetPlannerBoxEntry;
 import it.marco.shulkerplanner.plan.ItemRequirement;
@@ -26,6 +31,7 @@ public class GuiPlannerBoxes extends GuiPlannerBase<PlannedBox, WidgetPlannerBox
 {
     private static final long EXPORT_COOLDOWN_MS = 2000;
     private static boolean hideReady;
+    private static boolean showMoreOptions;
     private static long lastExport;
 
     public GuiPlannerBoxes()
@@ -90,30 +96,56 @@ public class GuiPlannerBoxes extends GuiPlannerBase<PlannedBox, WidgetPlannerBox
             return;
         }
 
-        ButtonGeneric button = this.createValueButton("shulkerplanner.gui.button.pack_mode", project.getPackMode().getDisplayName(), project.getPackMode().getHoverText());
+        FlatButton button = this.createValueButton("shulkerplanner.gui.button.pack_mode", project.getPackMode().getDisplayName(), project.getPackMode().getHoverText());
         this.addFlowButton(button, (btn, mb) -> {
             project.setPackMode(project.getPackMode().cycle(mb == ScanCodes.OFFSET_MOUSE_LEFT));
-            this.onProjectChanged();
+            this.onPackingOptionsChanged();
         });
 
         button = this.createValueButton("shulkerplanner.gui.button.count_mode", project.getCountMode().getDisplayName(), project.getCountMode().getHoverText());
         this.addFlowButton(button, (btn, mb) -> {
             project.setCountMode(project.getCountMode().cycle(mb == ScanCodes.OFFSET_MOUSE_LEFT));
-            this.onProjectChanged();
+            this.onPackingOptionsChanged();
         });
 
-        button = this.createOnOffButton("shulkerplanner.gui.button.round_up", project.getRoundUpStacks(),
-                                        StringUtils.translate("shulkerplanner.gui.button.round_up.hover"));
+        button = this.createToggle("shulkerplanner.gui.button.pack_raw", project.getPackRawMaterials(),
+                                   StringUtils.translate("shulkerplanner.gui.button.pack_raw.hover"));
+        this.addFlowButton(button, (btn, mb) -> {
+            project.setPackRawMaterials(! project.getPackRawMaterials());
+            this.onPackingOptionsChanged();
+        });
+
+        button = this.createToggle("shulkerplanner.gui.button.hide_ready", hideReady, StringUtils.translate("shulkerplanner.gui.button.hide_ready.hover"));
+        this.addFlowButton(button, (btn, mb) -> {
+            hideReady = ! hideReady;
+            this.initGui();
+        });
+
+        button = new FlatButton(0, 0, -1, (showMoreOptions ? "▴ " : "▾ ") + StringUtils.translate("shulkerplanner.gui.button.more_options"), FlatButton.Style.GHOST);
+        this.addFlowButton(button, (btn, mb) -> {
+            showMoreOptions = ! showMoreOptions;
+            this.initGui();
+        });
+
+        if (showMoreOptions == false)
+        {
+            return;
+        }
+
+        this.newFlowRow();
+
+        button = this.createToggle("shulkerplanner.gui.button.round_up", project.getRoundUpStacks(),
+                                   StringUtils.translate("shulkerplanner.gui.button.round_up.hover"));
         this.addFlowButton(button, (btn, mb) -> {
             project.setRoundUpStacks(! project.getRoundUpStacks());
-            this.onProjectChanged();
+            this.onPackingOptionsChanged();
         });
 
-        button = this.createOnOffButton("shulkerplanner.gui.button.fill_spare", project.getFillSpareSlots(),
-                                        StringUtils.translate("shulkerplanner.gui.button.fill_spare.hover"));
+        button = this.createToggle("shulkerplanner.gui.button.fill_spare", project.getFillSpareSlots(),
+                                   StringUtils.translate("shulkerplanner.gui.button.fill_spare.hover"));
         this.addFlowButton(button, (btn, mb) -> {
             project.setFillSpareSlots(! project.getFillSpareSlots());
-            this.onProjectChanged();
+            this.onPackingOptionsChanged();
         });
 
         button = this.createValueButton("shulkerplanner.gui.button.color", getColorName(project.getBoxColor()),
@@ -123,86 +155,130 @@ public class GuiPlannerBoxes extends GuiPlannerBase<PlannedBox, WidgetPlannerBox
             this.onProjectChanged();
         });
 
-        button = this.createOnOffButton("shulkerplanner.gui.button.hide_ready", hideReady, null);
-        this.addFlowButton(button, (btn, mb) -> {
-            hideReady = ! hideReady;
-            this.initGui();
-        });
+        if (BoxItemFactory.canGiveItems())
+        {
+            button = this.createAction("shulkerplanner.gui.button.give_all", StringUtils.translate("shulkerplanner.gui.button.give_all.hover"));
+            this.addFlowButton(button, (btn, mb) -> {
+                int given = BoxItemFactory.giveAllMissing(this.session);
+                int remaining = 0;
 
-        button = new ButtonGeneric(0, 0, -1, 20, StringUtils.translate("shulkerplanner.gui.button.give_all"),
-                                   StringUtils.translate("shulkerplanner.gui.button.give_all.hover"));
-        button.setEnabled(BoxItemFactory.canGiveItems());
-        this.addFlowButton(button, (btn, mb) -> {
-            int given = BoxItemFactory.giveAllMissing(this.session);
-            int remaining = 0;
-
-            for (PlannedBox box : this.session.getPlan().getBoxes())
-            {
-                if (this.session.isBoxReady(box) == false)
+                for (PlannedBox box : this.session.getPlan().getBoxes())
                 {
-                    ++remaining;
+                    if (this.session.isBoxReady(box) == false)
+                    {
+                        ++remaining;
+                    }
                 }
-            }
 
-            if (remaining > 0)
-            {
-                this.addMessage(MessageType.WARNING, 4000, "shulkerplanner.message.boxes_given_partial", given, remaining);
-            }
-            else
-            {
-                this.addMessage(MessageType.SUCCESS, 3000, "shulkerplanner.message.boxes_given", given);
-            }
-
-            this.initGui();
-        });
-
-        button = new ButtonGeneric(0, 0, -1, 20, StringUtils.translate("shulkerplanner.gui.button.export"),
-                                   StringUtils.translate("shulkerplanner.gui.button.export.hover"));
-        this.addFlowButton(button, (btn, mb) -> {
-            long now = System.currentTimeMillis();
-
-            if (now - lastExport < EXPORT_COOLDOWN_MS)
-            {
-                this.addMessage(MessageType.WARNING, 1500, "shulkerplanner.message.export_cooldown");
-                return;
-            }
-
-            lastExport = now;
-            String text = BoxItemFactory.createExportText(project, this.session.getPlan());
-
-            if (GuiBase.isShiftDown())
-            {
-                this.mc.keyboardHandler.setClipboard(text);
-                this.addMessage(MessageType.SUCCESS, 3000, "shulkerplanner.message.copied_to_clipboard");
-            }
-            else
-            {
-                Path file = ProjectStorage.writeExport(project.getName(), text);
-
-                if (file != null)
+                if (remaining > 0)
                 {
-                    this.addMessage(MessageType.SUCCESS, 5000, "shulkerplanner.message.exported", file.getFileName().toString());
+                    this.addMessage(MessageType.WARNING, 4000, "shulkerplanner.message.boxes_given_partial", given, remaining);
                 }
                 else
                 {
-                    this.addMessage(MessageType.ERROR, 4000, "shulkerplanner.message.export_failed");
+                    this.addMessage(MessageType.SUCCESS, 3000, "shulkerplanner.message.boxes_given", given);
                 }
-            }
-        });
 
-        button = new ButtonGeneric(0, 0, -1, 20, StringUtils.translate("shulkerplanner.gui.button.reset_boxes"),
-                                   StringUtils.translate("shulkerplanner.gui.button.reset_boxes.hover"));
-        this.addFlowButton(button, (btn, mb) -> {
-            if (GuiBase.isShiftDown())
+                this.initGui();
+            });
+        }
+
+        button = this.createAction("shulkerplanner.gui.button.export", StringUtils.translate("shulkerplanner.gui.button.export.hover"));
+        this.addFlowButton(button, (btn, mb) -> this.export(project));
+
+        if (this.session.isPlanLocked())
+        {
+            button = this.createAction("shulkerplanner.gui.button.reset_plan", StringUtils.translate("shulkerplanner.gui.button.reset_plan.hover"));
+            button.setStyle(FlatButton.Style.DANGER);
+            this.addFlowButton(button, (btn, mb) -> {
+                if (GuiBase.isShiftDown())
+                {
+                    this.session.resetPlan();
+                    this.addMessage(MessageType.SUCCESS, 2500, "shulkerplanner.message.plan_reset");
+                    this.initGui();
+                }
+                else
+                {
+                    this.addMessage(MessageType.WARNING, 3000, "shulkerplanner.message.hold_shift_to_reset");
+                }
+            });
+        }
+    }
+
+    private void export(PlannerProject project)
+    {
+        long now = System.currentTimeMillis();
+
+        if (now - lastExport < EXPORT_COOLDOWN_MS)
+        {
+            this.addMessage(MessageType.WARNING, 1500, "shulkerplanner.message.export_cooldown");
+            return;
+        }
+
+        lastExport = now;
+        String text = BoxItemFactory.createExportText(project, this.session.getPlan());
+
+        if (GuiBase.isShiftDown())
+        {
+            this.mc.keyboardHandler.setClipboard(text);
+            this.addMessage(MessageType.SUCCESS, 3000, "shulkerplanner.message.copied_to_clipboard");
+        }
+        else
+        {
+            Path file = ProjectStorage.writeExport(project.getName(), text);
+
+            if (file != null)
             {
-                project.clearDoneBoxes();
-                this.onProjectChanged();
+                this.addMessage(MessageType.SUCCESS, 5000, "shulkerplanner.message.exported", file.getFileName().toString());
             }
             else
             {
-                this.addMessage(MessageType.WARNING, 3000, "shulkerplanner.message.hold_shift_to_reset");
+                this.addMessage(MessageType.ERROR, 4000, "shulkerplanner.message.export_failed");
             }
-        });
+        }
+    }
+
+    @Override
+    @Nullable
+    protected Banner createBanner()
+    {
+        PlannerProject project = this.getProject();
+
+        if (project == null || this.session.getPlan().isEmpty())
+        {
+            return null;
+        }
+
+        if (this.session.isPlanLocked())
+        {
+            if (this.session.isPlanOutdated() && Configs.Warnings.WARN_PLAN_OUTDATED.getBooleanValue())
+            {
+                Map<String, Long> changes = this.session.getPlanChanges();
+                long more = 0;
+                long less = 0;
+
+                for (long d : changes.values())
+                {
+                    if (d > 0) more += d; else less -= d;
+                }
+
+                String text = StringUtils.translate("shulkerplanner.gui.banner.outdated", changes.size(), Format.number(more), Format.number(less));
+                return new Banner(text, Theme.WARN, Theme.WARN_BG, StringUtils.translate("shulkerplanner.gui.button.update_plan"), () -> {
+                    this.session.updateLockedPlan();
+                    this.addMessage(MessageType.SUCCESS, 2500, "shulkerplanner.message.plan_updated");
+                    this.initGui();
+                });
+            }
+
+            return new Banner(StringUtils.translate("shulkerplanner.gui.banner.locked"), Theme.ACCENT_HOVER, Theme.ACCENT_BG, null, null);
+        }
+
+        return new Banner(StringUtils.translate("shulkerplanner.gui.banner.draft"), Theme.TEXT_DIM, Theme.SURFACE_2,
+                          StringUtils.translate("shulkerplanner.gui.button.lock_plan"), () -> {
+                              this.session.lockPlan();
+                              this.addMessage(MessageType.SUCCESS, 2500, "shulkerplanner.message.plan_locked");
+                              this.initGui();
+                          });
     }
 
     @Override
@@ -240,7 +316,7 @@ public class GuiPlannerBoxes extends GuiPlannerBase<PlannedBox, WidgetPlannerBox
         }
 
         String readyColor = ready >= count ? GuiBase.TXT_GREEN : GuiBase.TXT_YELLOW;
-        lines.add(boxInfo + GuiBase.TXT_RST + "  " + readyColor + StringUtils.translate("shulkerplanner.gui.label.boxes.ready", ready, count));
+        lines.add(boxInfo + GuiBase.TXT_RST + "   " + readyColor + StringUtils.translate("shulkerplanner.gui.label.boxes.ready", ready, count));
 
         String line2 = GuiBase.TXT_GRAY + StringUtils.translate("shulkerplanner.gui.label.boxes.summary_items", Format.number(plan.getTotalItems()), plan.getTotalStacks());
 
@@ -250,13 +326,13 @@ public class GuiPlannerBoxes extends GuiPlannerBase<PlannedBox, WidgetPlannerBox
 
             for (ItemRequirement req : plan.getLooseItems())
             {
-                loose.add(req.count() + "x " + req.proto().getHoverName().getString());
+                loose.add(req.count() + "x " + new MaterialRow(req.id(), 0, 0).getDisplayName());
             }
 
-            line2 += GuiBase.TXT_GOLD + "  " + StringUtils.translate("shulkerplanner.gui.label.boxes.loose", String.join(", ", loose));
+            line2 += GuiBase.TXT_GOLD + "   " + StringUtils.translate("shulkerplanner.gui.label.boxes.loose", String.join(", ", loose));
         }
 
-        lines.add(Format.trim(line2, this.getScreenWidth() - MARGIN * 2 - 4));
+        lines.add(line2);
 
         return lines;
     }

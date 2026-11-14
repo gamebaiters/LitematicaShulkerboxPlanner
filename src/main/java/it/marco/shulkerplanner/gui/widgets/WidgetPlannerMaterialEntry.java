@@ -9,18 +9,23 @@ import net.minecraft.world.item.ItemStack;
 
 import fi.dy.masa.malilib.gui.GuiBase;
 import fi.dy.masa.malilib.gui.Message.MessageType;
-import fi.dy.masa.malilib.gui.button.ButtonGeneric;
 import fi.dy.masa.malilib.gui.widgets.WidgetListEntryBase;
 import fi.dy.masa.malilib.render.GuiContext;
-import fi.dy.masa.malilib.render.RenderUtils;
 import fi.dy.masa.malilib.util.StringUtils;
 
 import it.marco.shulkerplanner.data.MaterialRow;
 import it.marco.shulkerplanner.data.PlannerProject;
+import it.marco.shulkerplanner.data.PlannerSession;
 import it.marco.shulkerplanner.data.Reminder;
 import it.marco.shulkerplanner.gui.GuiPlannerMaterials;
+import it.marco.shulkerplanner.gui.ui.FlatButton;
+import it.marco.shulkerplanner.gui.ui.Theme;
+import it.marco.shulkerplanner.gui.ui.Ui;
 import it.marco.shulkerplanner.util.Format;
 
+/**
+ * One material: how many are needed, already packed in boxes, carried, and still to get.
+ */
 public class WidgetPlannerMaterialEntry extends WidgetListEntryBase<MaterialRow>
 {
     private final WidgetListPlannerMaterials list;
@@ -41,52 +46,41 @@ public class WidgetPlannerMaterialEntry extends WidgetListEntryBase<MaterialRow>
         if (entry != null && project != null)
         {
             String id = entry.getId();
-            int xRight = x + width - 2;
-            int by = y + 1;
+            int xRight = x + width - 4;
+            int by = y + 2;
 
-            // Placed from right to left
-            ButtonGeneric include = new ButtonGeneric(xRight - this.layout.widthInclude, by, this.layout.widthInclude, 20,
-                                                      getIncludeLabel(project.isExcluded(id) == false),
-                                                      StringUtils.translate("shulkerplanner.gui.button.include.hover"));
+            FlatButton include = FlatButton.toggle(StringUtils.translate("shulkerplanner.gui.button.include"), project.isExcluded(id) == false,
+                                                   StringUtils.translate("shulkerplanner.gui.button.include.hover"));
+            include.setPosition(xRight - this.layout.widthInclude, by);
+            include.setWidth(this.layout.widthInclude);
             this.addButton(include, (btn, mb) -> {
                 project.setExcluded(id, ! project.isExcluded(id));
-                this.list.getGui().onProjectChanged();
+                this.list.getGui().onPackingOptionsChanged();
             });
-            xRight = include.getX() - 2;
+            xRight = include.getX() - 4;
 
-            ButtonGeneric gathered = new ButtonGeneric(xRight - this.layout.widthGathered, by, this.layout.widthGathered, 20,
-                                                       getGatheredLabel(project.isGathered(id)),
-                                                       StringUtils.translate("shulkerplanner.gui.button.gathered.hover"));
+            FlatButton gathered = FlatButton.toggle(StringUtils.translate("shulkerplanner.gui.button.gathered_short"), project.isGathered(id),
+                                                    StringUtils.translate("shulkerplanner.gui.button.gathered.hover"));
+            gathered.setPosition(xRight - this.layout.widthGathered, by);
+            gathered.setWidth(this.layout.widthGathered);
             this.addButton(gathered, (btn, mb) -> {
                 project.setGathered(id, ! project.isGathered(id));
                 this.list.getGui().onProjectChanged();
             });
-            xRight = gathered.getX() - 2;
+            xRight = gathered.getX() - 4;
 
-            ButtonGeneric note = new ButtonGeneric(xRight - this.layout.widthNote, by, this.layout.widthNote, 20,
-                                                   StringUtils.translate("shulkerplanner.gui.button.add_note_short"),
-                                                   StringUtils.translate("shulkerplanner.gui.button.add_note.hover"));
+            FlatButton note = new FlatButton(xRight - this.layout.widthNote, by, this.layout.widthNote, "+", FlatButton.Style.GHOST,
+                                             StringUtils.translate("shulkerplanner.gui.button.add_note.hover"));
             this.addButton(note, (btn, mb) -> this.addReminder(project, entry));
         }
     }
 
-    public static String getIncludeLabel(boolean included)
-    {
-        return included ? GuiBase.TXT_GREEN + StringUtils.translate("shulkerplanner.gui.button.included")
-                        : GuiBase.TXT_RED + StringUtils.translate("shulkerplanner.gui.button.excluded");
-    }
-
-    public static String getGatheredLabel(boolean gathered)
-    {
-        return gathered ? GuiBase.TXT_GREEN + StringUtils.translate("shulkerplanner.gui.button.gathered")
-                        : GuiBase.TXT_GRAY + StringUtils.translate("shulkerplanner.gui.button.not_gathered");
-    }
-
     private void addReminder(PlannerProject project, MaterialRow row)
     {
-        int count = project.getRequiredCount(row);
+        long toGet = this.layout.stillToGet(row.getId());
+        int count = (int) Math.min(Integer.MAX_VALUE, toGet > 0 ? toGet : this.layout.needed(row.getId()));
         int maxStack = row.getStack().getMaxStackSize();
-        String amount = count > 0 ? Format.number(count) + " (" + Format.stacks(count, maxStack) + ")" : Format.number(row.getTotal());
+        String amount = Format.number(count) + " (" + Format.stacks(count, maxStack) + ")";
         String text = StringUtils.translate("shulkerplanner.reminder.gather_item", amount, row.getDisplayName());
 
         GuiPlannerMaterials gui = this.list.getGui();
@@ -113,82 +107,99 @@ public class WidgetPlannerMaterialEntry extends WidgetListEntryBase<MaterialRow>
     {
         PlannerProject project = this.list.getGui().getProject();
         boolean header = this.entry == null;
-
-        if (header == false && this.isMouseOver(mouseX, mouseY))
-        {
-            RenderUtils.drawRect(ctx, this.x, this.y, this.width, this.height, 0xA0707070);
-        }
-        else
-        {
-            RenderUtils.drawRect(ctx, this.x, this.y, this.width, this.height, this.isOdd ? 0xA0101010 : 0xA0303030);
-        }
-
-        int ty = this.y + 7;
+        boolean hover = header == false && this.isMouseOver(mouseX, mouseY);
 
         if (header)
         {
+            Ui.rect(ctx, this.x, this.y + this.height - 1, this.width, 1, Theme.BORDER);
+
             if (this.list.getSearchBarWidget().isSearchOpen() == false)
             {
-                this.drawHeader(ctx, ty);
+                this.drawHeader(ctx, this.y + 8);
             }
 
             return;
         }
+
+        Ui.rect(ctx, this.x, this.y, this.width, this.height, hover ? Theme.SURFACE_3 : (this.isOdd ? Theme.withAlpha(Theme.SURFACE_2, 0x90) : 0));
 
         if (project == null)
         {
             return;
         }
 
+        PlannerSession session = PlannerSession.INSTANCE;
         MaterialRow row = this.entry;
         String id = row.getId();
-        boolean excluded = project.isExcluded(id);
+        boolean ignored = session.isIgnoredInLitematica(id);
+        boolean excluded = project.isExcluded(id) || ignored;
         boolean gathered = project.isGathered(id);
         ItemStack stack = row.getStack();
         int maxStack = stack.getMaxStackSize();
-        int count = project.getRequiredCount(row);
+        long needed = this.layout.needed(id);
+        long packed = this.layout.packed(id);
+        long carrying = this.layout.carrying(id);
+        long toGet = this.layout.stillToGet(id);
+        boolean complete = excluded == false && (toGet <= 0 || gathered);
+        int ty = this.y + 7;
         int x0 = this.x;
 
-        RenderUtils.drawRect(ctx, x0 + 4, this.y + 3, 16, 16, 0x20FFFFFF);
-        ctx.renderItem(stack, x0 + 4, this.y + 3);
+        // Status stripe: done / in progress / missing
+        int stripe = excluded ? 0 : (complete ? Theme.SUCCESS : (packed + carrying > 0 ? Theme.WARN : Theme.DANGER));
 
-        String name = Format.trim(row.getDisplayName(), this.layout.nameWidth - 22);
-
-        if (excluded)
+        if (stripe != 0)
         {
-            name = GuiBase.TXT_DARK_GRAY + GuiBase.TXT_STRIKETHROUGH + name;
-        }
-        else if (gathered)
-        {
-            name = GuiBase.TXT_GREEN + name;
-        }
-        else if (stack.getItem().canFitInsideContainerItems() == false)
-        {
-            name = GuiBase.TXT_GOLD + name;
+            Ui.rect(ctx, x0, this.y + 3, 2, this.height - 6, stripe);
         }
 
-        this.drawString(ctx, x0 + 24, ty, 0xFFFFFFFF, name);
+        Ui.item(ctx, stack, x0 + 6, this.y + 3);
 
-        String color = excluded ? GuiBase.TXT_DARK_GRAY : (count == 0 ? GuiBase.TXT_GREEN : GuiBase.TXT_WHITE);
-        this.drawString(ctx, x0 + this.layout.colRequired, ty, 0xFFFFFFFF, color + Format.number(count));
+        String name = Ui.trim(row.getDisplayName(), this.layout.nameWidth - 24);
+        int nameColor = excluded ? Theme.TEXT_MUTED : (complete ? Theme.SUCCESS : (stack.getItem().canFitInsideContainerItems() ? Theme.TEXT : Theme.WARN));
+        Ui.text(ctx, excluded ? GuiBase.TXT_STRIKETHROUGH + name : name, x0 + 26, ty, nameColor);
 
-        if (this.layout.colAvailable >= 0)
+        int dim = excluded ? Theme.TEXT_MUTED : Theme.TEXT;
+        Ui.text(ctx, Format.number(excluded ? project.getRequiredCount(row) : needed), x0 + this.layout.colNeeded, ty, dim);
+
+        if (this.layout.colPacked >= 0)
         {
-            int available = row.getAvailable();
-            String c = excluded ? GuiBase.TXT_DARK_GRAY : (available >= count ? GuiBase.TXT_GREEN : (available > 0 ? GuiBase.TXT_GOLD : GuiBase.TXT_RED));
-            this.drawString(ctx, x0 + this.layout.colAvailable, ty, 0xFFFFFFFF, c + Format.number(available));
+            Ui.text(ctx, Format.number(packed), x0 + this.layout.colPacked, ty, excluded ? Theme.TEXT_MUTED : (packed > 0 ? Theme.SUCCESS : Theme.TEXT_MUTED));
+            Ui.text(ctx, Format.number(carrying), x0 + this.layout.colCarrying, ty, excluded ? Theme.TEXT_MUTED : (carrying > 0 ? Theme.INFO : Theme.TEXT_MUTED));
         }
 
-        if (this.layout.colBoxes >= 0)
+        if (this.layout.colToGet >= 0)
         {
-            String c = excluded ? GuiBase.TXT_DARK_GRAY : GuiBase.TXT_AQUA;
-            this.drawString(ctx, x0 + this.layout.colBoxes, ty, 0xFFFFFFFF, c + Format.boxes(count, maxStack));
+            String str;
+            int color;
+
+            if (excluded)
+            {
+                str = "—";
+                color = Theme.TEXT_MUTED;
+            }
+            else if (toGet <= 0)
+            {
+                str = "✔ 0";
+                color = Theme.SUCCESS;
+            }
+            else
+            {
+                str = Format.number(toGet);
+                color = gathered ? Theme.TEXT_DIM : Theme.DANGER;
+            }
+
+            Ui.text(ctx, str, x0 + this.layout.colToGet, ty, color);
         }
 
-        if (this.layout.colStacks >= 0)
+        if (this.layout.colBar >= 0 && excluded == false)
         {
-            String c = excluded ? GuiBase.TXT_DARK_GRAY : GuiBase.TXT_GRAY;
-            this.drawString(ctx, x0 + this.layout.colStacks, ty, 0xFFFFFFFF, c + Format.stacks(count, maxStack));
+            Ui.progressStacked(ctx, x0 + this.layout.colBar, this.y + 9, this.layout.barWidth, 4, needed,
+                               new long[] { packed, carrying }, new int[] { Theme.SUCCESS, Theme.INFO }, Theme.SURFACE_HOVER);
+        }
+
+        if (this.layout.colStacks >= 0 && excluded == false)
+        {
+            Ui.text(ctx, toGet > 0 ? Format.stacks((int) Math.min(Integer.MAX_VALUE, toGet), maxStack) : "", x0 + this.layout.colStacks, ty, Theme.TEXT_DIM);
         }
 
         super.render(ctx, mouseX, mouseY, selected);
@@ -196,26 +207,27 @@ public class WidgetPlannerMaterialEntry extends WidgetListEntryBase<MaterialRow>
 
     private void drawHeader(GuiContext ctx, int y)
     {
-        String b = GuiBase.TXT_BOLD;
         String k = WidgetListPlannerMaterials.Layout.KEY_HEADER;
         int x0 = this.x;
+        int c = Theme.TEXT_DIM;
 
-        this.drawString(ctx, x0 + 4, y, 0xFFFFFFFF, b + StringUtils.translate(k + "item"));
-        this.drawString(ctx, x0 + this.layout.colRequired, y, 0xFFFFFFFF, b + StringUtils.translate(k + "required"));
+        Ui.text(ctx, StringUtils.translate(k + "item"), x0 + 6, y, c);
+        Ui.text(ctx, StringUtils.translate(k + "needed"), x0 + this.layout.colNeeded, y, c);
 
-        if (this.layout.colAvailable >= 0)
+        if (this.layout.colPacked >= 0)
         {
-            this.drawString(ctx, x0 + this.layout.colAvailable, y, 0xFFFFFFFF, b + StringUtils.translate(k + "available"));
+            Ui.text(ctx, StringUtils.translate(k + "packed"), x0 + this.layout.colPacked, y, Theme.SUCCESS);
+            Ui.text(ctx, StringUtils.translate(k + "carrying"), x0 + this.layout.colCarrying, y, Theme.INFO);
         }
 
-        if (this.layout.colBoxes >= 0)
+        if (this.layout.colToGet >= 0)
         {
-            this.drawString(ctx, x0 + this.layout.colBoxes, y, 0xFFFFFFFF, b + StringUtils.translate(k + "boxes"));
+            Ui.text(ctx, StringUtils.translate(k + "to_get"), x0 + this.layout.colToGet, y, Theme.DANGER);
         }
 
         if (this.layout.colStacks >= 0)
         {
-            this.drawString(ctx, x0 + this.layout.colStacks, y, 0xFFFFFFFF, b + StringUtils.translate(k + "stacks"));
+            Ui.text(ctx, StringUtils.translate(k + "stacks"), x0 + this.layout.colStacks, y, c);
         }
     }
 
@@ -233,35 +245,43 @@ public class WidgetPlannerMaterialEntry extends WidgetListEntryBase<MaterialRow>
         }
 
         MaterialRow row = this.entry;
+        String id = row.getId();
         ItemStack stack = row.getStack();
         int maxStack = stack.getMaxStackSize();
-        int count = project.getRequiredCount(row);
         List<String> lines = new ArrayList<>();
         String k = "shulkerplanner.gui.hover.material.";
+        long needed = this.layout.needed(id);
 
-        lines.add(GuiBase.TXT_BOLD + row.getDisplayName() + GuiBase.TXT_RST + GuiBase.TXT_DARK_GRAY + "  " + row.getId());
+        lines.add(GuiBase.TXT_BOLD + row.getDisplayName() + GuiBase.TXT_RST + GuiBase.TXT_DARK_GRAY + "  " + id);
         lines.add(StringUtils.translate(k + "total", Format.number(row.getTotal()), Format.stacks(row.getTotal(), maxStack)));
         lines.add(StringUtils.translate(k + "missing", Format.number(row.getMissing()), Format.stacks(row.getMissing(), maxStack)));
-        lines.add(StringUtils.translate(k + "available", Format.number(row.getAvailable())));
-        lines.add(StringUtils.translate(k + "required", project.getCountMode().getDisplayName(), Format.number(count),
-                                        Format.stacks(count, maxStack), Format.boxes(count, maxStack)));
-        lines.add(StringUtils.translate(k + "stack_size", maxStack));
+        lines.add(StringUtils.translate(k + "required", project.getCountMode().getDisplayName(), Format.number(needed),
+                                        Format.stacks((int) Math.min(Integer.MAX_VALUE, needed), maxStack), Format.boxes((int) Math.min(Integer.MAX_VALUE, needed), maxStack)));
+        lines.add(GuiBase.TXT_GREEN + StringUtils.translate(k + "packed", Format.number(this.layout.packed(id))));
+        lines.add(GuiBase.TXT_AQUA + StringUtils.translate(k + "carrying", Format.number(this.layout.carrying(id))));
+        lines.add(GuiBase.TXT_RED + StringUtils.translate(k + "to_get", Format.number(this.layout.stillToGet(id))));
+        lines.add(GuiBase.TXT_DARK_GRAY + StringUtils.translate(k + "stack_size", maxStack));
 
         if (stack.getItem().canFitInsideContainerItems() == false)
         {
             lines.add(GuiBase.TXT_GOLD + StringUtils.translate(k + "not_boxable"));
         }
 
-        if (project.isExcluded(row.getId()))
+        if (PlannerSession.INSTANCE.isIgnoredInLitematica(id))
+        {
+            lines.add(GuiBase.TXT_GRAY + StringUtils.translate(k + "ignored_litematica"));
+        }
+
+        if (project.isExcluded(id))
         {
             lines.add(GuiBase.TXT_RED + StringUtils.translate(k + "excluded"));
         }
 
-        if (project.isGathered(row.getId()))
+        if (project.isGathered(id))
         {
             lines.add(GuiBase.TXT_GREEN + StringUtils.translate(k + "gathered"));
         }
 
-        RenderUtils.drawHoverText(ctx, mouseX, mouseY, lines);
+        Ui.tooltip(ctx, mouseX, mouseY, lines);
     }
 }

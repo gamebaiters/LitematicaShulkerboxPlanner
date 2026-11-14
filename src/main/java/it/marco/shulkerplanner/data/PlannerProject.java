@@ -22,10 +22,13 @@ import fi.dy.masa.malilib.util.data.json.JsonUtils;
 
 import it.marco.shulkerplanner.hud.HudStyle;
 import it.marco.shulkerplanner.hud.HudStyles;
+import it.marco.shulkerplanner.plan.BoxState;
 import it.marco.shulkerplanner.plan.CountMode;
 import it.marco.shulkerplanner.plan.ItemRequirement;
 import it.marco.shulkerplanner.plan.PackMode;
 import it.marco.shulkerplanner.plan.PlannedBox;
+import it.marco.shulkerplanner.plan.PlannedStack;
+import it.marco.shulkerplanner.plan.PlanRebaser;
 
 /**
  * Everything that gets saved per schematic: the material snapshot, the planner options,
@@ -41,7 +44,21 @@ public class PlannerProject
     private final List<MaterialRow> materials = new ArrayList<>();
     private final Set<String> excluded = new LinkedHashSet<>();
     private final Set<String> gathered = new LinkedHashSet<>();
-    private final Map<String, Integer> doneBoxes = new HashMap<>();
+    /** 1.x: done counters per box contents. Only read, and turned into box states when the plan gets locked. */
+    private final Map<String, Integer> legacyDoneBoxes = new HashMap<>();
+    private final Map<Integer, BoxState> boxStates = new HashMap<>();
+    private final List<ShulkerBinding> bindings = new ArrayList<>();
+    /** The boxes of the locked plan, null while the plan follows the material list freely */
+    @Nullable private List<PlannedBox> lockedBoxes;
+    /** The requirements the locked plan was made for, to tell the player when the material list changed */
+    private Map<String, Long> lockedRequirements = new HashMap<>();
+    private int nextBoxId = 1;
+    private int followedBoxId = -1;
+    private boolean packRawMaterials;
+    private boolean allowSmelting = true;
+    private boolean allowStonecutter = true;
+    private final Set<String> rawBaseItems = new LinkedHashSet<>();
+    private final Map<String, String> recipeChoice = new HashMap<>();
     private final List<Reminder> reminders = new ArrayList<>();
     private String sourceTitle = "";
     private String schematicName = "";
@@ -142,22 +159,15 @@ public class PlannerProject
      */
     public int getRequiredCount(MaterialRow row)
     {
-        long total = (long) row.getTotal() * this.multiplier;
-        long missing = this.multiplier > 1 ? total : row.getMissing();
-
-        long count = switch (this.countMode)
-        {
-            case TOTAL -> total;
-            case MISSING -> missing;
-            case TO_GATHER -> Math.max(0, missing - row.getAvailable());
-        };
-
-        return (int) Math.min(Integer.MAX_VALUE, count);
+        return (int) Math.min(Integer.MAX_VALUE, this.countMode.required(row.getTotal(), row.getMissing(), this.multiplier));
     }
 
-    public List<ItemRequirement> buildRequirements()
+    /**
+     * @return the amount of every included material to pack, item id to count
+     */
+    public Map<String, Long> buildRequiredCounts()
     {
-        List<ItemRequirement> list = new ArrayList<>();
+        Map<String, Long> map = new java.util.LinkedHashMap<>();
 
         for (MaterialRow row : this.materials)
         {
@@ -168,20 +178,56 @@ public class PlannerProject
 
             int count = this.getRequiredCount(row);
 
-            if (count <= 0)
+            if (count > 0)
             {
-                continue;
+                map.merge(row.getId(), (long) count, Long::sum);
             }
+        }
 
-            ItemStack stack = row.getStack();
-            Item item = stack.getItem();
-            int maxStack = Math.max(1, Math.min(99, stack.getMaxStackSize()));
-            boolean boxable = item.canFitInsideContainerItems();
+        return map;
+    }
 
-            list.add(new ItemRequirement(row.getId(), stack, count, maxStack, boxable, BuiltInRegistries.ITEM.getId(item)));
+    public List<ItemRequirement> buildRequirements()
+    {
+        return createRequirements(this.buildRequiredCounts());
+    }
+
+    public static List<ItemRequirement> createRequirements(Map<String, Long> counts)
+    {
+        List<ItemRequirement> list = new ArrayList<>();
+
+        for (Map.Entry<String, Long> e : counts.entrySet())
+        {
+            ItemRequirement req = createRequirement(e.getKey(), (int) Math.min(Integer.MAX_VALUE, e.getValue()));
+
+            if (req != null && req.count() > 0)
+            {
+                list.add(req);
+            }
         }
 
         return list;
+    }
+
+    /**
+     * @return the requirement of the given item, or null for unknown items
+     */
+    @Nullable
+    public static ItemRequirement createRequirement(String id, int count)
+    {
+        MaterialRow row = new MaterialRow(id, count, count);
+
+        if (row.isValid() == false)
+        {
+            return null;
+        }
+
+        ItemStack stack = row.getStack();
+        Item item = stack.getItem();
+        int maxStack = Math.max(1, Math.min(99, stack.getMaxStackSize()));
+        boolean boxable = item.canFitInsideContainerItems();
+
+        return new ItemRequirement(id, stack, count, maxStack, boxable, BuiltInRegistries.ITEM.getId(item));
     }
 
     // ---------------------------------------------------------------- item states
@@ -242,50 +288,260 @@ public class PlannerProject
 
     // ---------------------------------------------------------------- boxes
 
+    public boolean isLocked()
+    {
+        return this.lockedBoxes != null;
+    }
+
+    @Nullable
+    public List<PlannedBox> getLockedBoxes()
+    {
+        return this.lockedBoxes;
+    }
+
+    public Map<String, Long> getLockedRequirements()
+    {
+        return this.lockedRequirements;
+    }
+
     /**
-     * Identical boxes (same contents) share one counter, so marking one of them done
-     * marks "one more of those" as done, regardless of which one it was.
+     * Locks the plan: from now on the boxes only change when the player updates the plan.
      */
+    public void lock(List<PlannedBox> boxes, Map<String, Long> requirements)
+    {
+        this.lockedBoxes = new ArrayList<>(boxes);
+        this.lockedRequirements = new HashMap<>(requirements);
+        int max = 0;
+
+        for (PlannedBox box : boxes)
+        {
+            max = Math.max(max, box.getId());
+        }
+
+        this.nextBoxId = Math.max(this.nextBoxId, max + 1);
+        PlanRebaser.assignDuplicateOrdinals(this.lockedBoxes);
+
+        if (this.legacyDoneBoxes.isEmpty() == false)
+        {
+            for (PlannedBox box : this.lockedBoxes)
+            {
+                if (box.getDuplicateOrdinal() < this.legacyDoneBoxes.getOrDefault(box.getSignature(), 0))
+                {
+                    this.boxStates.put(box.getId(), BoxState.DONE);
+                }
+            }
+
+            this.legacyDoneBoxes.clear();
+        }
+    }
+
+    /**
+     * Throws the locked plan away, with all the box states and linked shulker boxes
+     */
+    public void unlock()
+    {
+        this.lockedBoxes = null;
+        this.lockedRequirements = new HashMap<>();
+        this.boxStates.clear();
+        this.bindings.clear();
+        this.followedBoxId = -1;
+        this.legacyDoneBoxes.clear();
+    }
+
+    public int getNextBoxId()
+    {
+        return this.nextBoxId;
+    }
+
+    public boolean hasLegacyDoneBoxes()
+    {
+        return this.legacyDoneBoxes.isEmpty() == false;
+    }
+
+    /**
+     * @return true if any box was started: state set, or a shulker box linked
+     */
+    public boolean hasProgress()
+    {
+        for (BoxState state : this.boxStates.values())
+        {
+            if (state != BoxState.TODO)
+            {
+                return true;
+            }
+        }
+
+        return this.bindings.isEmpty() == false;
+    }
+
+    /**
+     * @return true if the box has to stay as it is when the plan is updated
+     */
+    public boolean isBoxStarted(PlannedBox box)
+    {
+        return this.getBoxState(box.getId()) != BoxState.TODO || this.getBinding(box.getId()) != null;
+    }
+
+    public BoxState getBoxState(int boxId)
+    {
+        return this.boxStates.getOrDefault(boxId, BoxState.TODO);
+    }
+
+    public void setBoxState(int boxId, BoxState state)
+    {
+        if (state == BoxState.TODO)
+        {
+            this.boxStates.remove(boxId);
+        }
+        else
+        {
+            this.boxStates.put(boxId, state);
+        }
+    }
+
     public boolean isBoxDone(PlannedBox box)
     {
-        return box.getDuplicateOrdinal() < this.doneBoxes.getOrDefault(box.getSignature(), 0);
+        return this.getBoxState(box.getId()) == BoxState.DONE;
     }
 
-    public void setBoxDone(PlannedBox box, boolean done)
+    public void clearBoxStates()
     {
-        int count = this.doneBoxes.getOrDefault(box.getSignature(), 0);
-        count = Math.max(0, count + (done ? 1 : -1));
+        this.boxStates.clear();
+    }
 
-        if (count > 0)
+    public int getFollowedBoxId()
+    {
+        return this.followedBoxId;
+    }
+
+    public void setFollowedBoxId(int boxId)
+    {
+        this.followedBoxId = boxId;
+    }
+
+    // ---------------------------------------------------------------- linked shulker boxes
+
+    public List<ShulkerBinding> getBindings()
+    {
+        return this.bindings;
+    }
+
+    @Nullable
+    public ShulkerBinding getBinding(int boxId)
+    {
+        for (ShulkerBinding binding : this.bindings)
         {
-            this.doneBoxes.put(box.getSignature(), count);
+            if (binding.getBoxId() == boxId)
+            {
+                return binding;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Links a shulker box to a box of the plan. A box has at most one linked shulker box.
+     */
+    public void addBinding(ShulkerBinding binding)
+    {
+        this.bindings.removeIf(b -> b.getBoxId() == binding.getBoxId() || b == binding);
+        this.bindings.add(binding);
+
+        if (this.getBoxState(binding.getBoxId()) == BoxState.TODO)
+        {
+            this.setBoxState(binding.getBoxId(), BoxState.FILLING);
+        }
+    }
+
+    public void removeBinding(int boxId)
+    {
+        this.bindings.removeIf(b -> b.getBoxId() == boxId);
+    }
+
+    /**
+     * Removes the links and states of boxes that are not in the plan anymore
+     */
+    public void pruneBoxes(List<PlannedBox> boxes)
+    {
+        Set<Integer> ids = new java.util.HashSet<>();
+        boxes.forEach(b -> ids.add(b.getId()));
+        this.bindings.removeIf(b -> ids.contains(b.getBoxId()) == false);
+        this.boxStates.keySet().removeIf(id -> ids.contains(id) == false);
+
+        if (ids.contains(this.followedBoxId) == false)
+        {
+            this.followedBoxId = -1;
+        }
+    }
+
+    // ---------------------------------------------------------------- raw materials
+
+    public boolean getPackRawMaterials()
+    {
+        return this.packRawMaterials;
+    }
+
+    public void setPackRawMaterials(boolean packRawMaterials)
+    {
+        this.packRawMaterials = packRawMaterials;
+    }
+
+    public boolean getAllowSmelting()
+    {
+        return this.allowSmelting;
+    }
+
+    public void setAllowSmelting(boolean allowSmelting)
+    {
+        this.allowSmelting = allowSmelting;
+    }
+
+    public boolean getAllowStonecutter()
+    {
+        return this.allowStonecutter;
+    }
+
+    public void setAllowStonecutter(boolean allowStonecutter)
+    {
+        this.allowStonecutter = allowStonecutter;
+    }
+
+    /**
+     * @return the items the player wants to keep as they are, instead of breaking them down
+     */
+    public Set<String> getRawBaseItems()
+    {
+        return this.rawBaseItems;
+    }
+
+    public void setRawBase(String id, boolean base)
+    {
+        if (base)
+        {
+            this.rawBaseItems.add(id);
         }
         else
         {
-            this.doneBoxes.remove(box.getSignature());
+            this.rawBaseItems.remove(id);
         }
     }
 
-    public int getDoneCount(String signature)
+    public Map<String, String> getRecipeChoice()
     {
-        return this.doneBoxes.getOrDefault(signature, 0);
+        return this.recipeChoice;
     }
 
-    public void setDoneCount(String signature, int count)
+    public void setRecipeChoice(String itemId, @Nullable String recipeId)
     {
-        if (count > 0)
+        if (recipeId == null)
         {
-            this.doneBoxes.put(signature, count);
+            this.recipeChoice.remove(itemId);
         }
         else
         {
-            this.doneBoxes.remove(signature);
+            this.recipeChoice.put(itemId, recipeId);
         }
-    }
-
-    public void clearDoneBoxes()
-    {
-        this.doneBoxes.clear();
     }
 
     // ---------------------------------------------------------------- reminders
@@ -463,8 +719,6 @@ public class PlannerProject
         options.addProperty("hide_excluded", this.hideExcluded);
         options.addProperty("multiplier", this.multiplier);
         options.addProperty("box_color", this.boxColor);
-        obj.add("options", options);
-
         JsonArray arr = new JsonArray();
         this.materials.forEach(row -> arr.add(row.toJson()));
         obj.add("materials", arr);
@@ -472,9 +726,70 @@ public class PlannerProject
         obj.add("excluded", toArray(this.excluded));
         obj.add("gathered", toArray(this.gathered));
 
-        JsonObject boxes = new JsonObject();
-        this.doneBoxes.forEach(boxes::addProperty);
-        obj.add("done_boxes", boxes);
+        options.addProperty("pack_raw", this.packRawMaterials);
+        options.addProperty("allow_smelting", this.allowSmelting);
+        options.addProperty("allow_stonecutter", this.allowStonecutter);
+        obj.add("raw_base", toArray(this.rawBaseItems));
+        JsonObject choice = new JsonObject();
+        this.recipeChoice.forEach(choice::addProperty);
+        obj.add("recipe_choice", choice);
+
+        if (this.legacyDoneBoxes.isEmpty() == false)
+        {
+            JsonObject boxes = new JsonObject();
+            this.legacyDoneBoxes.forEach(boxes::addProperty);
+            obj.add("done_boxes", boxes);
+        }
+
+        JsonObject plan = new JsonObject();
+        plan.addProperty("next_id", this.nextBoxId);
+        plan.addProperty("followed", this.followedBoxId);
+
+        if (this.lockedBoxes != null)
+        {
+            JsonArray boxArr = new JsonArray();
+
+            for (PlannedBox box : this.lockedBoxes)
+            {
+                JsonObject b = new JsonObject();
+                b.addProperty("id", box.getId());
+                b.addProperty("n", box.getIndex());
+                JsonArray slots = new JsonArray();
+
+                for (PlannedStack stack : box.getSlots())
+                {
+                    JsonArray slot = new JsonArray();
+                    slot.add(stack.id());
+                    slot.add(stack.count());
+
+                    if (stack.spare())
+                    {
+                        slot.add(true);
+                    }
+
+                    slots.add(slot);
+                }
+
+                b.add("slots", slots);
+                boxArr.add(b);
+            }
+
+            plan.add("boxes", boxArr);
+            JsonObject reqs = new JsonObject();
+            this.lockedRequirements.forEach(reqs::addProperty);
+            plan.add("requirements", reqs);
+        }
+
+        JsonObject states = new JsonObject();
+        this.boxStates.forEach((id, state) -> states.addProperty(String.valueOf(id), state.getName()));
+        plan.add("states", states);
+
+        JsonArray bindArr = new JsonArray();
+        this.bindings.forEach(b -> bindArr.add(b.toJson()));
+        plan.add("links", bindArr);
+        obj.add("plan", plan);
+
+        obj.add("options", options);
 
         if (this.hudStyle != null)
         {
@@ -507,6 +822,9 @@ public class PlannerProject
             project.hideExcluded = JsonUtils.getBooleanOrDefault(options, "hide_excluded", false);
             project.setMultiplier(JsonUtils.getIntegerOrDefault(options, "multiplier", 1));
             project.setBoxColor(JsonUtils.getIntegerOrDefault(options, "box_color", 11));
+            project.packRawMaterials = JsonUtils.getBooleanOrDefault(options, "pack_raw", false);
+            project.allowSmelting = JsonUtils.getBooleanOrDefault(options, "allow_smelting", true);
+            project.allowStonecutter = JsonUtils.getBooleanOrDefault(options, "allow_stonecutter", true);
         }
 
         if (JsonUtils.hasArray(obj, "materials"))
@@ -527,6 +845,23 @@ public class PlannerProject
 
         readStrings(obj, "excluded", project.excluded);
         readStrings(obj, "gathered", project.gathered);
+        readStrings(obj, "raw_base", project.rawBaseItems);
+
+        if (JsonUtils.hasObject(obj, "recipe_choice"))
+        {
+            for (Map.Entry<String, JsonElement> e : obj.getAsJsonObject("recipe_choice").entrySet())
+            {
+                if (e.getValue().isJsonPrimitive())
+                {
+                    project.recipeChoice.put(e.getKey(), e.getValue().getAsString());
+                }
+            }
+        }
+
+        if (JsonUtils.hasObject(obj, "plan"))
+        {
+            readPlan(project, obj.getAsJsonObject("plan"));
+        }
 
         if (JsonUtils.hasObject(obj, "done_boxes"))
         {
@@ -538,7 +873,7 @@ public class PlannerProject
 
                     if (count > 0)
                     {
-                        project.doneBoxes.put(entry.getKey(), count);
+                        project.legacyDoneBoxes.put(entry.getKey(), count);
                     }
                 }
                 catch (Exception ignore) {}
@@ -569,6 +904,101 @@ public class PlannerProject
         }
 
         return project;
+    }
+
+    private static void readPlan(PlannerProject project, JsonObject plan)
+    {
+        project.nextBoxId = Math.max(1, JsonUtils.getIntegerOrDefault(plan, "next_id", 1));
+        project.followedBoxId = JsonUtils.getIntegerOrDefault(plan, "followed", -1);
+
+        if (JsonUtils.hasArray(plan, "boxes"))
+        {
+            List<PlannedBox> boxes = new ArrayList<>();
+            Map<String, ItemRequirement> reqs = new HashMap<>();
+
+            for (JsonElement el : plan.getAsJsonArray("boxes"))
+            {
+                try
+                {
+                    JsonObject b = el.getAsJsonObject();
+                    List<PlannedStack> slots = new ArrayList<>();
+
+                    for (JsonElement slotEl : b.getAsJsonArray("slots"))
+                    {
+                        JsonArray slot = slotEl.getAsJsonArray();
+                        String id = slot.get(0).getAsString();
+                        int count = slot.get(1).getAsInt();
+                        boolean spare = slot.size() > 2 && slot.get(2).getAsBoolean();
+                        ItemRequirement req = reqs.computeIfAbsent(id, k -> createRequirement(k, 1));
+
+                        if (req != null)
+                        {
+                            slots.add(new PlannedStack(req, count, spare));
+                        }
+                    }
+
+                    if (slots.isEmpty() == false)
+                    {
+                        PlannedBox box = new PlannedBox(slots);
+                        box.setId(b.get("id").getAsInt());
+                        box.setIndex(b.get("n").getAsInt());
+                        boxes.add(box);
+                    }
+                }
+                catch (Exception ignore) {}
+            }
+
+            boxes.sort((a, c) -> Integer.compare(a.getIndex(), c.getIndex()));
+            PlanRebaser.assignDuplicateOrdinals(boxes);
+            project.lockedBoxes = boxes;
+
+            for (PlannedBox box : boxes)
+            {
+                project.nextBoxId = Math.max(project.nextBoxId, box.getId() + 1);
+            }
+
+            if (JsonUtils.hasObject(plan, "requirements"))
+            {
+                for (Map.Entry<String, JsonElement> e : plan.getAsJsonObject("requirements").entrySet())
+                {
+                    try { project.lockedRequirements.put(e.getKey(), e.getValue().getAsLong()); }
+                    catch (Exception ignore) {}
+                }
+            }
+        }
+
+        if (JsonUtils.hasObject(plan, "states"))
+        {
+            for (Map.Entry<String, JsonElement> e : plan.getAsJsonObject("states").entrySet())
+            {
+                try
+                {
+                    BoxState state = BoxState.fromName(e.getValue().getAsString());
+
+                    if (state != BoxState.TODO)
+                    {
+                        project.boxStates.put(Integer.parseInt(e.getKey()), state);
+                    }
+                }
+                catch (Exception ignore) {}
+            }
+        }
+
+        if (JsonUtils.hasArray(plan, "links"))
+        {
+            for (JsonElement el : plan.getAsJsonArray("links"))
+            {
+                if (el.isJsonObject())
+                {
+                    ShulkerBinding binding = ShulkerBinding.fromJson(el.getAsJsonObject());
+
+                    if (binding != null)
+                    {
+                        project.bindings.add(binding);
+                    }
+                }
+            }
+        }
     }
 
     private static JsonArray toArray(Set<String> set)

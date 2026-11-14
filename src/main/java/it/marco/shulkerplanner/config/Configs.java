@@ -24,14 +24,18 @@ public class Configs implements IConfigHandler
 {
     private static final String CONFIG_FILE_NAME = Reference.MOD_ID + ".json";
     private static final String GENERIC_KEY = Reference.MOD_ID + ".config.generic";
+    private static final String WARNINGS_KEY = Reference.MOD_ID + ".config.warnings";
 
     public static class Generic
     {
         public static final ConfigBoolean HUD_ENABLED               = new ConfigBoolean("hudEnabled",               true).apply(GENERIC_KEY);
         public static final ConfigBoolean HUD_FOLLOW_PLACEMENT      = new ConfigBoolean("hudFollowSelectedPlacement", true).apply(GENERIC_KEY);
+        public static final ConfigBoolean HUD_FOLLOW_OPENED_BOX     = new ConfigBoolean("hudFollowOpenedBox",       true).apply(GENERIC_KEY);
         public static final ConfigBoolean PACKING_ASSISTANT         = new ConfigBoolean("packingAssistant",         true).apply(GENERIC_KEY);
-        public static final ConfigBoolean PACKING_HIGHLIGHT_SLOTS   = new ConfigBoolean("packingHighlightSlots",    true).apply(GENERIC_KEY);
+        public static final ConfigBoolean AUTO_LINK_OPENED_BOXES    = new ConfigBoolean("autoLinkOpenedBoxes",      false).apply(GENERIC_KEY);
         public static final ConfigBoolean AUTO_MARK_BOXES           = new ConfigBoolean("autoMarkFilledBoxes",      true).apply(GENERIC_KEY);
+        public static final ConfigBoolean AUTO_DETECT_INVENTORY_BOXES = new ConfigBoolean("autoDetectInventoryBoxes", true).apply(GENERIC_KEY);
+        public static final ConfigBoolean RESPECT_LITEMATICA_IGNORED = new ConfigBoolean("respectLitematicaIgnored", true).apply(GENERIC_KEY);
         public static final ConfigBoolean ADD_BUTTON_MATERIAL_LIST  = new ConfigBoolean("addButtonToMaterialList",  true).apply(GENERIC_KEY);
         public static final ConfigBoolean ADD_BUTTON_MAIN_MENU      = new ConfigBoolean("addButtonToMainMenu",      true).apply(GENERIC_KEY);
         public static final ConfigString  LAST_PROJECT              = new ConfigString("lastProject",               "").apply(GENERIC_KEY);
@@ -39,15 +43,55 @@ public class Configs implements IConfigHandler
         public static final ImmutableList<IConfigBase> OPTIONS = ImmutableList.of(
                 HUD_ENABLED,
                 HUD_FOLLOW_PLACEMENT,
+                HUD_FOLLOW_OPENED_BOX,
                 PACKING_ASSISTANT,
-                PACKING_HIGHLIGHT_SLOTS,
+                AUTO_LINK_OPENED_BOXES,
                 AUTO_MARK_BOXES,
+                AUTO_DETECT_INVENTORY_BOXES,
+                RESPECT_LITEMATICA_IGNORED,
                 ADD_BUTTON_MATERIAL_LIST,
                 ADD_BUTTON_MAIN_MENU
         );
 
         // Internal values, saved but not shown in the config GUI
         public static final List<IConfigBase> INTERNAL = ImmutableList.of(LAST_PROJECT);
+    }
+
+    /**
+     * Every warning and highlight, each one can be turned off
+     */
+    public static class Warnings
+    {
+        public static final ConfigBoolean PANEL_WRONG_ITEMS         = new ConfigBoolean("warnWrongItemsInBox",      true).apply(WARNINGS_KEY);
+        public static final ConfigBoolean HIGHLIGHT_WRONG_SLOTS     = new ConfigBoolean("highlightWrongSlots",      true).apply(WARNINGS_KEY);
+        public static final ConfigBoolean HIGHLIGHT_OVERFILLED      = new ConfigBoolean("highlightOverfilledSlots", true).apply(WARNINGS_KEY);
+        public static final ConfigBoolean HIGHLIGHT_ITEMS_TO_MOVE   = new ConfigBoolean("highlightItemsToMove",     true).apply(WARNINGS_KEY);
+        public static final ConfigBoolean HIGHLIGHT_UNLINKED        = new ConfigBoolean("highlightUnlinkedPreview", false).apply(WARNINGS_KEY);
+        public static final ConfigBoolean HUD_WRONG_ITEMS           = new ConfigBoolean("hudWrongItems",            true).apply(WARNINGS_KEY);
+        public static final ConfigBoolean HINT_UNLINKED_BOX         = new ConfigBoolean("hintUnlinkedBox",          true).apply(WARNINGS_KEY);
+        public static final ConfigBoolean NOTIFY_BOX_COMPLETE       = new ConfigBoolean("notifyBoxComplete",        true).apply(WARNINGS_KEY);
+        public static final ConfigBoolean WARN_PLAN_OUTDATED        = new ConfigBoolean("warnPlanOutdated",         true).apply(WARNINGS_KEY);
+
+        public static final ImmutableList<IConfigBase> OPTIONS = ImmutableList.of(
+                PANEL_WRONG_ITEMS,
+                HIGHLIGHT_WRONG_SLOTS,
+                HIGHLIGHT_OVERFILLED,
+                HIGHLIGHT_ITEMS_TO_MOVE,
+                HIGHLIGHT_UNLINKED,
+                HUD_WRONG_ITEMS,
+                HINT_UNLINKED_BOX,
+                NOTIFY_BOX_COMPLETE,
+                WARN_PLAN_OUTDATED
+        );
+
+        /** Turns every warning and highlight on or off at once */
+        public static void setAll(boolean enabled)
+        {
+            for (IConfigBase config : OPTIONS)
+            {
+                ((ConfigBoolean) config).setBooleanValue(enabled);
+            }
+        }
     }
 
     /**
@@ -81,6 +125,7 @@ public class Configs implements IConfigHandler
                 JsonObject root = element.getAsJsonObject();
 
                 ConfigUtils.readConfigBase(root, "Generic", Generic.OPTIONS);
+                ConfigUtils.readConfigBase(root, "Warnings", Warnings.OPTIONS);
                 ConfigUtils.readConfigBase(root, "Generic", Legacy.OPTIONS);
                 ConfigUtils.readConfigBase(root, "Internal", Generic.INTERNAL);
                 ConfigUtils.readConfigBase(root, "Hotkeys", Hotkeys.HOTKEY_LIST);
@@ -104,6 +149,7 @@ public class Configs implements IConfigHandler
         JsonObject root = new JsonObject();
 
         ConfigUtils.writeConfigBase(root, "Generic", Generic.OPTIONS);
+        ConfigUtils.writeConfigBase(root, "Warnings", Warnings.OPTIONS);
         ConfigUtils.writeConfigBase(root, "Internal", Generic.INTERNAL);
         ConfigUtils.writeConfigBase(root, "Hotkeys", Hotkeys.HOTKEY_LIST);
 

@@ -1,5 +1,22 @@
 # Changelog
 
+## 2.0.0 - Minecraft 26.3
+
+- **Fixed material calculations and progress tracking:**
+  - Respects Litematica's ignored blocks (`respectLitematicaIgnored`), correctly counts items inside carried shulker boxes and bundles (`autoDetectInventoryBoxes`), and separates **Needed**, **Packed**, **Carrying**, and **To get** columns.
+  - Plans can now be **Locked** so phases and IDs stay fixed when Litematica's material list changes, with an **Update plan** banner and rebase logic (`PlanRebaser`) that preserves started/linked boxes.
+- **Manual shulker box linking & persistent tracking:**
+  - Opening a new shulker box no longer auto-links or resets work-in-progress boxes (`autoLinkOpenedBoxes` is off by default).
+  - Link/unlink any shulker box manually to a specific phase in the packing assistant (`+ Link to #N` / `Unlink`).
+  - Linked boxes stay tracked even when broken, carried in the inventory, and placed again elsewhere (`ShulkerTracker`).
+- **Raw source materials mode (`Raw materials` tab):**
+  - Recursively breaks down blocks into raw source resources and ordered crafting/smelting/stonecutting/smithing steps (using world recipes in singleplayer or vanilla recipes on multiplayer).
+  - Toggle furnace smelting and stonecutter usage, cycle alternative recipes per item, mark intermediates as **Keep base**, or switch the box planner to pack raw source materials directly (**Pack raw items**).
+- **Configurable warnings & highlights (`Settings` tab):**
+  - Every warning and slot highlight (panel wrong items, red wrong slots, yellow overfilled slots, green items to move, unlinked preview, HUD wrong items, unlinked hint, completion notification, outdated plan banner) can be toggled individually or all at once.
+- **Complete UI/UX overhaul:**
+  - Modern dark-purple theme with unified sidebar navigation, header progress bar, status chips (`LOCKED` / `DRAFT` / `RAW`), flat buttons, compact responsive mode, and redesigned packing assistant panel.
+
 ## 1.2.0 - Minecraft 26.3
 
 - Every schematic now has its own HUD style, saved with the project.

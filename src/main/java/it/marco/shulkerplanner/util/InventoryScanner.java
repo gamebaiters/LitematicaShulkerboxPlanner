@@ -170,6 +170,84 @@ public class InventoryScanner
     }
 
     /**
+     * A shulker box item in the player's inventory
+     *
+     * @param slot       the inventory slot
+     * @param itemId     the shulker box item id (its color)
+     * @param customName the name given in an anvil, or null
+     * @param contents   item id to count
+     */
+    public record ShulkerItem(int slot, String itemId, @Nullable String customName, Map<String, Integer> contents)
+    {
+        public String signature()
+        {
+            return PlannedBox.createSignature(this.contents);
+        }
+    }
+
+    /**
+     * @return every shulker box item in the player's inventory, empty ones included
+     */
+    public static List<ShulkerItem> getShulkerItems(@Nullable Player player)
+    {
+        List<ShulkerItem> list = new ArrayList<>();
+
+        if (player == null)
+        {
+            return list;
+        }
+
+        Inventory inv = player.getInventory();
+
+        for (int slot : SCANNED_SLOTS)
+        {
+            ItemStack stack = inv.getItem(slot);
+            Map<String, Integer> contents = getShulkerContents(stack);
+
+            if (contents != null)
+            {
+                list.add(new ShulkerItem(slot, getId(stack), getCustomName(stack), contents));
+            }
+        }
+
+        return list;
+    }
+
+    @Nullable
+    public static String getCustomName(ItemStack stack)
+    {
+        var name = stack.get(DataComponents.CUSTOM_NAME);
+        return name != null ? name.getString() : null;
+    }
+
+    /**
+     * Counts the items inside bundles in the player's inventory
+     */
+    public static Map<String, Integer> countBundleItems(@Nullable Player player)
+    {
+        Map<String, Integer> map = new HashMap<>();
+
+        if (player == null)
+        {
+            return map;
+        }
+
+        Inventory inv = player.getInventory();
+
+        for (int slot : SCANNED_SLOTS)
+        {
+            BundleContents bundle = inv.getItem(slot).get(DataComponents.BUNDLE_CONTENTS);
+
+            if (bundle != null)
+            {
+                bundle.itemCopies().forEach(s -> map.merge(getId(s), s.getCount(), Integer::sum));
+            }
+        }
+
+        return map;
+    }
+
+    /**
      * @return the content signature to count map of the non-empty shulker boxes in the player's inventory
      */
     public static Map<String, Integer> getShulkerSignatures(@Nullable Player player)

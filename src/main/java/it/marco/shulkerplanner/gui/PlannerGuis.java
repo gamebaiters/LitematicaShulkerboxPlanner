@@ -31,7 +31,9 @@ public class PlannerGuis
         {
             case MATERIALS -> new GuiPlannerMaterials();
             case BOXES -> new GuiPlannerBoxes();
+            case RAW -> new GuiPlannerRaw();
             case REMINDERS -> new GuiPlannerReminders();
+            case SETTINGS -> new GuiPlannerSettings();
         };
 
         gui.setParent(parent);

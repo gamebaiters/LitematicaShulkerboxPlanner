@@ -21,6 +21,7 @@ public class PlannedBox
     private final boolean pure;
     private final long itemCount;
     private int index;
+    private int id;
     private int duplicateOrdinal;
 
     public PlannedBox(List<PlannedStack> slots)
@@ -101,16 +102,29 @@ public class PlannedBox
     }
 
     /**
-     * @return the 1-based box number
+     * @return the box number shown to the player (#3). Stays the same for a box once the plan is locked.
      */
     public int getIndex()
     {
         return this.index;
     }
 
-    void setIndex(int index)
+    public void setIndex(int index)
     {
         this.index = index;
+    }
+
+    /**
+     * @return the stable id of this box (phase). States, linked shulker boxes and the HUD refer to boxes by this id.
+     */
+    public int getId()
+    {
+        return this.id;
+    }
+
+    public void setId(int id)
+    {
+        this.id = id;
     }
 
     /**
@@ -121,7 +135,7 @@ public class PlannedBox
         return this.duplicateOrdinal;
     }
 
-    void setDuplicateOrdinal(int ordinal)
+    public void setDuplicateOrdinal(int ordinal)
     {
         this.duplicateOrdinal = ordinal;
     }

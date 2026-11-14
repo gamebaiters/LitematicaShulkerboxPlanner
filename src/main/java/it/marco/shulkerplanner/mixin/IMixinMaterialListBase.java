@@ -13,4 +13,7 @@ public interface IMixinMaterialListBase
     @Nullable
     @Accessor("completionListener")
     ICompletionListener shulkerplanner_getCompletionListener();
+
+    @Accessor("ignored")
+    java.util.Set<fi.dy.masa.litematica.materials.MaterialListEntry> shulkerplanner_getIgnored();
 }

@@ -46,7 +46,7 @@ t("gui.button.open_planner_short", "Shulker Planner", "Shulker Planner")
 t("gui.button.open_planner.hover", "Pianifica le shulker box da riempire\nper questa lista materiali", "Plan the shulker boxes to fill\nfor this material list")
 t("gui.button.count_mode", "Conteggio: %s", "Count: %s")
 t("gui.button.sort", "Ordina: %s", "Sort: %s")
-t("gui.button.hide_excluded", "Nascondi esclusi: %s", "Hide excluded: %s")
+t("gui.button.hide_excluded", "Nascondi esclusi", "Hide excluded")
 t("gui.button.include_all", "Includi tutti", "Include all")
 t("gui.button.exclude_all", "Escludi tutti", "Exclude all")
 t("gui.button.exclude_gathered", "Escludi procurati", "Exclude gathered")
@@ -63,13 +63,13 @@ t("gui.button.add_note_short", "+ Nota", "+ Note")
 t("gui.button.add_note.hover", "Aggiungi un promemoria per questo item", "Add a reminder for this item")
 t("gui.button.add_note_box.hover", "Aggiungi un promemoria per riempire questa shulker", "Add a reminder to fill this box")
 t("gui.button.pack_mode", "Modalità: %s", "Mode: %s")
-t("gui.button.round_up", "Stack completi: %s", "Full stacks: %s")
+t("gui.button.round_up", "Stack completi", "Full stacks")
 t("gui.button.round_up.hover", "Arrotonda ogni item a stack completi (es. 70 -> 128),\ncosì ogni slot è pieno al massimo", "Rounds every item up to full stacks (eg. 70 -> 128),\nso every slot is completely full")
-t("gui.button.fill_spare", "Riempi slot vuoti: %s", "Fill empty slots: %s")
+t("gui.button.fill_spare", "Riempi slot vuoti", "Fill empty slots")
 t("gui.button.fill_spare.hover", "Riempie gli slot liberi di ogni shulker con stack\nextra dell'item principale di quella shulker (scorta)", "Fills the free slots of every box with extra\nstacks of the main item of that box (spares)")
 t("gui.button.color", "Colore: %s", "Color: %s")
 t("gui.button.color.hover", "Colore delle shulker create in creativa.\nClick sinistro / destro per cambiare", "Color of the boxes created in creative mode.\nLeft / right click to change")
-t("gui.button.hide_ready", "Nascondi pronte: %s", "Hide ready: %s")
+t("gui.button.hide_ready", "Nascondi pronte", "Hide ready")
 t("gui.button.give_all", "Crea tutte (creativa)", "Create all (creative)")
 t("gui.button.give_all.hover", "Mette nell'inventario tutte le shulker non ancora pronte,\ngià riempite. Solo in modalità creativa.", "Puts all the boxes that are not ready yet into your\ninventory, already filled. Creative mode only.")
 t("gui.button.give", "Crea", "Create")
@@ -86,7 +86,7 @@ t("gui.button.add_reminder.hover", "Aggiungi il promemoria (oppure premi Invio)"
 t("gui.button.save_reminder", "Salva", "Save")
 t("gui.button.cancel", "Annulla", "Cancel")
 t("gui.button.remove_completed", "Rimuovi completati", "Remove completed")
-t("gui.button.show_completed", "Mostra completati: %s", "Show completed: %s")
+t("gui.button.show_completed", "Mostra completati", "Show completed")
 t("gui.button.hud", "HUD: %s", "HUD: %s")
 t("gui.button.hud.hover", "HUD in gioco: progresso, shulker in corso con gli item\nche ti mancano e promemoria aperti (hotkey M+H)", "In-game HUD: progress, the current box with the items\nyou still need and the open reminders (hotkey M+H)")
 t("gui.button.reminder_toggle.hover", "Segna come fatto / da fare", "Mark as done / to do")
@@ -264,6 +264,130 @@ t("hud_editor.hint", "Trascina per spostare - angolo o rotellina per ridimension
 t("gui.button.edit_hud", "Personalizza HUD", "Customize HUD")
 t("gui.button.edit_hud.hover", "Posizione, dimensione, titolo, tema, colori ed elementi\ndell'HUD di questa schematica. Hotkey M+J", "Position, size, title, theme, colors and elements\nof the HUD of this schematic. Hotkey M+J")
 
+# 2.0: Tabs, Shell, Banners, Linking, Raw Materials, Assistant, Settings
+t("gui.tab.raw", "Materie prime", "Raw materials")
+t("gui.tab.raw.hover", "Calcola le risorse sorgente e i passi di crafting", "Calculates raw source resources and crafting steps")
+t("gui.tab.settings", "Impostazioni", "Settings")
+t("gui.tab.settings.hover", "Attiva o disattiva avvisi, evidenziazioni e opzioni", "Toggle warnings, highlights and options")
+t("gui.tab.boxes.hover", "Fasi del piano shulker, stato e collegamenti", "Planned shulker phases, states and links")
+t("gui.tab.materials.hover", "Lista completa dei materiali da procurare e impacchettare", "Full list of materials to gather and pack")
+t("gui.tab.reminders.hover", "Note e promemoria per questo progetto", "Notes and reminders for this project")
+
+t("gui.brand", "SHULKER PLANNER", "SHULKER PLANNER")
+t("gui.header.progress", "%s/%s shulker", "%s/%s boxes")
+t("gui.chip.locked", "BLOCCATO", "LOCKED")
+t("gui.chip.draft", "BOZZA", "DRAFT")
+t("gui.chip.raw", "SORGENTI", "RAW")
+t("gui.label.source", "Litematica", "Litematica")
+t("gui.hover.cycle", "Clic: successivo · Destro: precedente", "Click: next · Right-click: previous")
+t("gui.button.hud_short", "HUD", "HUD")
+t("gui.button.more_options", "Altre opzioni", "More options")
+
+t("box_state.todo", "Da fare", "To do")
+t("box_state.filling", "In corso", "Filling")
+t("box_state.done", "Pronta", "Done")
+
+t("recipe_type.stonecutting", "Tagliapietre", "Stonecutter")
+t("recipe_type.crafting", "Banco da lavoro", "Crafting table")
+t("recipe_type.smelting", "Fornace", "Furnace")
+t("recipe_type.smithing", "Banco da forgiatura", "Smithing table")
+
+t("gui.banner.draft", "Piano in bozza: si aggiorna da solo con Litematica. Bloccalo per iniziare a riempire le shulker.", "Draft plan: follows Litematica automatically. Lock it when you start packing boxes.")
+t("gui.banner.locked", "Piano bloccato: fasi, stati e shulker collegate restano fissi.", "Locked plan: phases, states and linked shulker boxes stay fixed.")
+t("gui.banner.outdated", "La lista materiali è cambiata (%s differenze: +%s / -%s).", "The material list changed (%s differences: +%s / -%s).")
+t("gui.banner.recipes_world", "Ricette caricate dal mondo corrente (%s ricette, datapack/mod inclusi).", "Recipes loaded from the current world (%s recipes, data packs/mods included).")
+t("gui.banner.recipes_vanilla", "Ricette vanilla dal client (%s ricette).", "Vanilla recipes loaded from client (%s recipes).")
+
+t("gui.button.lock_plan", "Blocca piano", "Lock plan")
+t("gui.button.update_plan", "Aggiorna piano", "Update plan")
+t("gui.button.reset_plan", "Sblocca / Azzera", "Unlock / Reset")
+t("gui.button.reset_plan.hover", "Tieni Shift e clicca per sbloccare il piano\ne azzerare stati e shulker collegate", "Hold Shift and click to unlock the plan\nand clear box states and linked shulker boxes")
+t("gui.button.hide_ready.hover", "Nasconde le shulker già segnate come pronte", "Hides boxes already marked as ready")
+t("gui.button.box_undo", "Riapri", "Reopen")
+t("gui.button.follow", "Segui", "Follow")
+t("gui.button.follow.hover", "Mostra questa fase sull'HUD e nell'assistente", "Follow this phase on the HUD and packing assistant")
+t("gui.button.unlink", "Scollega", "Unlink")
+t("gui.button.unlink.hover", "Tieni Shift e clicca per scollegare questa shulker box", "Hold Shift and click to unlink this shulker box")
+t("gui.button.include", "Includi", "Include")
+t("gui.button.gathered_short", "Procurato", "Gathered")
+
+t("gui.button.pack_raw", "Impacchetta sorgenti", "Pack raw items")
+t("gui.button.pack_raw.hover", "Pianifica le shulker con le materie prime sorgente\nanziché con i blocchi finali", "Plans the shulker boxes using raw source materials\ninstead of the final crafted blocks")
+t("gui.button.allow_smelting", "Fornace", "Smelting")
+t("gui.button.allow_smelting.hover", "Scompone anche i blocchi cotti in fornace (es. pietra, vetro)", "Also breaks down smelted items (e.g. stone, glass)")
+t("gui.button.allow_stonecutter", "Tagliapietre", "Stonecutter")
+t("gui.button.allow_stonecutter.hover", "Usa il tagliapietre per evitare sprechi di blocchi in pietra", "Uses the stonecutter to avoid wasting stone blocks")
+t("gui.button.reset_recipes", "Ripristina ricette", "Reset recipes")
+t("gui.button.reset_recipes.hover", "Ripristina le scelte predefinite delle ricette\ne gli item tenuti come base", "Resets custom recipe choices and kept base items")
+t("gui.button.break_down", "Scomponi", "Break down")
+t("gui.button.break_down.hover", "Torna a scomporre questo item nei suoi ingredienti", "Break this item down into its ingredients again")
+t("gui.button.keep_item", "Tieni base", "Keep base")
+t("gui.button.keep_item.hover", "Considera questo item come risorsa di partenza\nsenza scomporlo ulteriormente", "Treat this item as a raw resource without breaking it down")
+t("gui.button.recipe", "Ricetta %s/%s", "Recipe %s/%s")
+t("gui.button.recipe.hover", "Clic per cambiare ricetta di crafting per questo item", "Click to cycle the crafting recipe for this item")
+
+t("gui.button.warnings_all_on", "Attiva tutti gli avvisi", "Enable all warnings")
+t("gui.button.warnings_all_on.hover", "Attiva tutti gli avvisi e le evidenziazioni", "Turns on every warning and slot highlight")
+t("gui.button.warnings_all_off", "Disattiva tutti gli avvisi", "Disable all warnings")
+t("gui.button.warnings_all_off.hover", "Disattiva tutti gli avvisi di item sbagliati o in eccesso", "Turns off every wrong-item and extra-item warning")
+t("gui.button.open_hotkeys", "Hotkey e Config completo", "Hotkeys & Full Config")
+t("gui.button.open_hotkeys.hover", "Apre la schermata MaLiLib con tutte le scorciatoie da tastiera", "Opens the MaLiLib screen with all keybinds")
+
+t("gui.label.box.not_linked", "Nessuna shulker collegata", "No shulker box linked")
+t("gui.label.box.status_filling", "In corso", "Filling")
+t("gui.label.boxes.empty_list", "Nessuna shulker da mostrare per questo filtro", "No boxes to show for this filter")
+t("gui.hover.box.linked", "Collegata: %s", "Linked: %s")
+t("gui.hover.box.how_to_link", "Apri una shulker in gioco e premi '+ Collega' nell'assistente", "Open a shulker box in-game and click '+ Link' in the assistant")
+
+t("gui.label.materials.header.item", "Materiale", "Material")
+t("gui.label.materials.header.needed", "Serve", "Needed")
+t("gui.label.materials.header.packed", "Nelle box", "Packed")
+t("gui.label.materials.header.carrying", "In inv.", "Carrying")
+t("gui.label.materials.header.to_get", "Manca", "To get")
+t("gui.label.materials.header.stacks", "Stack", "Stacks")
+
+t("gui.label.raw.header_raw", "MATERIE PRIME SORGENTE", "RAW SOURCE MATERIALS")
+t("gui.label.raw.header_steps", "PASSI DI CRAFTING", "CRAFTING STEPS")
+t("gui.label.raw.boxes", "Shulker", "Boxes")
+t("gui.label.raw.crafts", "%s craft", "%s crafts")
+t("gui.label.raw.have", "Hai: %s", "Have: %s")
+t("gui.label.raw.leftover", "Avanzo: %s", "Leftover: %s")
+t("gui.label.raw.summary1", "%s risorse sorgente (%s item totali) · %s passi di crafting", "%s raw resources (%s total items) · %s crafting steps")
+t("gui.label.raw.summary_packing_raw", "Modalità attiva: le shulker contengono le materie prime (%s shulker).", "Active mode: boxes are packed with raw materials (%s boxes).")
+t("gui.label.raw.summary_packing_listed", "Modalità attiva: le shulker contengono i blocchi finali (%s shulker).", "Active mode: boxes are packed with final blocks (%s boxes).")
+t("gui.hover.raw.raw", "Totale da procurare: %s", "Total needed: %s")
+t("gui.hover.raw.step", "Servono %s · %s craft (x%s = %s prodotti)", "Need %s · %s crafts (x%s = %s produced)")
+t("gui.hover.raw.any_of", "uno tra %s", "any of %s")
+
+t("gui.settings.section.warnings", "AVVISI ED EVIDENZIAZIONI", "WARNINGS & HIGHLIGHTS")
+t("gui.settings.section.generic", "OPZIONI GENERALI", "GENERAL OPTIONS")
+t("gui.summary.settings", "%s/%s avvisi attivi", "%s/%s warnings enabled")
+
+t("hud.linked", "Collegata", "Linked")
+t("hud.followed", "Seguita", "Followed")
+t("link.carried", "nell'inventario", "in inventory")
+t("link.placed", "piazzata a %s, %s, %s", "placed at %s, %s, %s")
+
+t("assistant.box", "Fase #%s / %s", "Phase #%s / %s")
+t("assistant.state.done", "Pronta", "Done")
+t("assistant.state.linked", "Collegata", "Linked")
+t("assistant.state.preview", "Anteprima", "Preview")
+t("assistant.to_put_in", "Da inserire: %s", "Put in: %s")
+t("assistant.too_many", "In eccesso: +%s", "Extra: +%s")
+t("assistant.hint_unlinked1", "Shulker non collegata a nessuna fase", "Shulker box not linked to any phase")
+t("assistant.hint_unlinked2", "Scegli una fase con ◀ ▶ e premi Collega", "Pick a phase with ◀ ▶ and click Link")
+t("assistant.link", "Collega a #%s", "Link to #%s")
+t("assistant.unlink", "Scollega", "Unlink")
+t("assistant.mark_done", "Segna pronta", "Mark done")
+t("assistant.undo_done", "Riapri fase", "Reopen")
+t("assistant.already_linked", "Questa fase ha già un'altra shulker", "Phase already linked to another box")
+
+t("message.box_complete", "Shulker #%s completata!", "Shulker box #%s complete!")
+t("message.hold_shift_to_unlink", "Tieni premuto Shift per scollegare la shulker", "Hold Shift to unlink the shulker box")
+t("message.plan_locked", "Piano bloccato: ora puoi collegare le tue shulker box", "Plan locked: you can now link your shulker boxes")
+t("message.plan_reset", "Piano sbloccato e azzerato", "Plan unlocked and reset")
+t("message.plan_updated", "Piano aggiornato alle nuove quantità", "Plan updated to the new material counts")
+
 # Config
 t("hotkeys.category.generic", "Hotkey", "Hotkeys")
 
@@ -271,11 +395,25 @@ configs = {
     "generic": [
         ("hudEnabled", "HUD promemoria", "Reminder HUD", "Mostra a schermo il progetto attivo, il progresso\ne i promemoria aperti", "Shows the active project, the progress\nand the open reminders on screen"),
         ("hudFollowSelectedPlacement", "HUD segue il placement", "HUD follows placement", "Quando selezioni un placement di Litematica che ha già un progetto,\nl'HUD passa a quella schematica", "When you select a Litematica placement that already has a project,\nthe HUD switches to that schematic"),
+        ("hudFollowOpenedBox", "HUD segue shulker aperta", "HUD follows opened box", "Quando apri una shulker collegata al piano,\nl'HUD mostra automaticamente quella fase", "When you open a shulker box linked to the plan,\nthe HUD automatically shows that box"),
         ("packingAssistant", "Assistente riempimento", "Packing assistant", "Quando apri una shulker box mostra a lato cosa\ndeve contenere secondo il piano", "When opening a shulker box, shows next to it\nwhat it should contain according to the plan"),
-        ("packingHighlightSlots", "Evidenzia slot", "Highlight slots", "Evidenzia in verde gli item da mettere nella shulker\ne in rosso quelli sbagliati", "Highlights the items to put into the box in green\nand the wrong ones in red"),
-        ("autoMarkFilledBoxes", "Segna shulker automaticamente", "Auto mark filled boxes", "Segna come pronte le shulker riempite con l'assistente\no presenti nell'inventario con il contenuto giusto", "Marks boxes as ready when filled with the assistant\nor when they are in your inventory with the right contents"),
+        ("autoLinkOpenedBoxes", "Collega shulker in automatico", "Auto-link opened boxes", "Sconsigliato: collega automaticamente una shulker appena la apri.\nDisattivato di default per collegare le shulker solo a mano.", "Not recommended: automatically links a shulker box on open.\nOff by default so you link boxes manually."),
+        ("autoMarkFilledBoxes", "Segna shulker automaticamente", "Auto mark filled boxes", "Segna come pronte le shulker collegate quando contengono\nesattamente gli item previsti dal piano", "Marks linked boxes as ready when they contain\nthe exact items required by the plan"),
+        ("autoDetectInventoryBoxes", "Rileva shulker in inventario", "Detect boxes in inventory", "Conta gli item dentro le shulker e i bundle\nche porti nell'inventario", "Counts items inside shulker boxes and bundles\nin your inventory"),
+        ("respectLitematicaIgnored", "Rispetta blocchi ignorati Litematica", "Respect Litematica ignored", "Esclude dai calcoli i blocchi che hai ignorato\nnella lista materiali di Litematica", "Excludes blocks ignored in Litematica's\nmaterial list from calculations"),
         ("addButtonToMaterialList", "Bottone nella lista materiali", "Button in material list", "Aggiunge il bottone Shulker Planner\nalla lista materiali di Litematica", "Adds the Shulker Planner button\nto the Litematica material list"),
         ("addButtonToMainMenu", "Bottone nel menu Litematica", "Button in Litematica menu", "Aggiunge il bottone Shulker Planner\nal menu principale di Litematica", "Adds the Shulker Planner button\nto the Litematica main menu"),
+    ],
+    "warnings": [
+        ("warnWrongItemsInBox", "Avviso item sbagliati nel pannello", "Panel wrong items warning", "Mostra nell'assistente gli item presenti nella shulker\nche non fanno parte di quella fase", "Shows items in the packing assistant that\ndon't belong in this box"),
+        ("highlightWrongSlots", "Evidenzia slot sbagliati (rosso)", "Highlight wrong slots (red)", "Colora di rosso gli slot della shulker con item\nsbagliati rispetto al piano", "Highlights slots with wrong items in red"),
+        ("highlightOverfilledSlots", "Evidenzia slot in eccesso (giallo)", "Highlight overfilled slots (yellow)", "Colora di giallo gli slot che hanno più item\ndel necessario per quella fase", "Highlights slots with more items than needed in yellow"),
+        ("highlightItemsToMove", "Evidenzia item da spostare (verde)", "Highlight items to move (green)", "Colora di verde nell'inventario gli item\nche servono per questa shulker", "Highlights items in your inventory needed for this box in green"),
+        ("highlightUnlinkedPreview", "Evidenzia anche senza collegamento", "Highlight even when unlinked", "Mostra gli avvisi colorati sugli slot anche quando\nla shulker aperta non è ancora collegata", "Shows slot highlights even when the opened\nshulker box is not linked yet"),
+        ("hudWrongItems", "Avviso item sbagliati nell'HUD", "HUD wrong items warning", "Mostra nell'HUD eventuali item sbagliati o in eccesso\ndentro la shulker collegata", "Shows wrong or extra items in the linked box on the HUD"),
+        ("hintUnlinkedBox", "Suggerimento shulker non collegata", "Unlinked box hint", "Mostra nell'assistente il promemoria che la shulker\nnon è collegata finché non premi Collega", "Shows a hint in the assistant when a shulker\nis not linked until you click Link"),
+        ("notifyBoxComplete", "Notifica fase completata", "Notify box complete", "Mostra un messaggio nella actionbar quando\ncompleti una shulker collegata", "Shows an actionbar message when a linked\nshulker box is completed"),
+        ("warnPlanOutdated", "Avviso piano non aggiornato", "Outdated plan warning", "Mostra un banner nel planner quando la lista materiali\ndi Litematica cambia rispetto al piano bloccato", "Shows a banner when Litematica's material list\nchanges compared to the locked plan"),
     ],
     "hotkeys": [
         ("openShulkerPlanner", "Apri Shulker Planner", "Open Shulker Planner", "Apre il planner per la lista materiali corrente\no per il placement selezionato", "Opens the planner for the current material list\nor for the selected placement"),

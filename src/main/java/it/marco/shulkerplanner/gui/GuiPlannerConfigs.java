@@ -43,6 +43,7 @@ public class GuiPlannerConfigs extends GuiConfigsBase
         List<ConfigOptionWrapper> list = new ArrayList<>();
 
         list.addAll(ConfigOptionWrapper.createFor(Configs.Generic.OPTIONS));
+        list.addAll(ConfigOptionWrapper.createFor(Configs.Warnings.OPTIONS));
         list.addAll(ConfigOptionWrapper.createFor(Hotkeys.HOTKEY_LIST));
 
         return list;

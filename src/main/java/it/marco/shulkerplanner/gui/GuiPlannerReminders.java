@@ -9,12 +9,12 @@ import net.minecraft.client.input.KeyEvent;
 import fi.dy.masa.malilib.gui.GuiBase;
 import fi.dy.masa.malilib.gui.GuiTextFieldGeneric;
 import fi.dy.masa.malilib.gui.Message.MessageType;
-import fi.dy.masa.malilib.gui.button.ButtonGeneric;
 import fi.dy.masa.malilib.util.StringUtils;
 import fi.dy.masa.malilib.util.input.ScanCodes;
 
 import it.marco.shulkerplanner.data.PlannerProject;
 import it.marco.shulkerplanner.data.Reminder;
+import it.marco.shulkerplanner.gui.ui.FlatButton;
 import it.marco.shulkerplanner.gui.widgets.WidgetListPlannerReminders;
 import it.marco.shulkerplanner.gui.widgets.WidgetPlannerReminderEntry;
 
@@ -93,13 +93,13 @@ public class GuiPlannerReminders extends GuiPlannerBase<Reminder, WidgetPlannerR
         this.textField.setValueWrapper(draft);
 
         String key = editing != null ? "shulkerplanner.gui.button.save_reminder" : "shulkerplanner.gui.button.add_reminder";
-        ButtonGeneric button = new ButtonGeneric(0, 0, -1, 20, StringUtils.translate(key),
-                                                 StringUtils.translate("shulkerplanner.gui.button.add_reminder.hover"));
+        FlatButton button = new FlatButton(0, 0, -1, StringUtils.translate(key), FlatButton.Style.PRIMARY,
+                                           StringUtils.translate("shulkerplanner.gui.button.add_reminder.hover"));
         this.addFlowButton(button, (btn, mb) -> this.submit());
 
         if (editing != null)
         {
-            button = new ButtonGeneric(0, 0, -1, 20, StringUtils.translate("shulkerplanner.gui.button.cancel"));
+            button = new FlatButton(0, 0, -1, StringUtils.translate("shulkerplanner.gui.button.cancel"), FlatButton.Style.GHOST);
             this.addFlowButton(button, (btn, mb) -> {
                 editing = null;
                 draft = "";
@@ -107,13 +107,13 @@ public class GuiPlannerReminders extends GuiPlannerBase<Reminder, WidgetPlannerR
             });
         }
 
-        button = new ButtonGeneric(0, 0, -1, 20, StringUtils.translate("shulkerplanner.gui.button.remove_completed"));
+        button = new FlatButton(0, 0, -1, StringUtils.translate("shulkerplanner.gui.button.remove_completed"), FlatButton.Style.SECONDARY);
         this.addFlowButton(button, (btn, mb) -> {
             project.getReminders().removeIf(Reminder::isDone);
             this.onProjectChanged();
         });
 
-        button = this.createOnOffButton("shulkerplanner.gui.button.show_completed", showCompleted, null);
+        button = this.createToggle("shulkerplanner.gui.button.show_completed", showCompleted, null);
         this.addFlowButton(button, (btn, mb) -> {
             showCompleted = ! showCompleted;
             this.initGui();

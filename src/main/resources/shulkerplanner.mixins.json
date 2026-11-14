@@ -9,7 +9,8 @@
 		"IMixinMaterialListSchematic",
 		"MixinAbstractContainerScreen",
 		"MixinGuiMainMenu",
-		"MixinGuiMaterialList"
+		"MixinGuiMaterialList",
+		"MixinMultiPlayerGameMode"
 	],
 	"injectors": {
 		"defaultRequire": 1

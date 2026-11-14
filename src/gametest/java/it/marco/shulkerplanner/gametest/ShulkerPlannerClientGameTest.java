@@ -191,7 +191,7 @@ public class ShulkerPlannerClientGameTest implements FabricClientGameTest
         // Wait for the cleared inventory to reach the client, the scan would mark the box again otherwise
         ctx.waitTicks(10);
         ctx.runOnClient(mc -> {
-            PlannerSession.INSTANCE.getProject().clearDoneBoxes();
+            PlannerSession.INSTANCE.getProject().clearBoxStates();
             PlannerSession.INSTANCE.onProjectChanged();
         });
         ctx.waitTicks(25);
@@ -225,13 +225,18 @@ public class ShulkerPlannerClientGameTest implements FabricClientGameTest
             return stacks;
         });
 
+        // Manually link this shulker to box #6 (never auto-linked on open)
+        ctx.runOnClient(mc -> {
+            PlannedBox targetBox = PlannerSession.INSTANCE.getPlan().getBoxes().get(5);
+            it.marco.shulkerplanner.render.PackingAssistant.linkOpenBox(targetBox);
+        });
         fillShulker(sp, pos, box6, 0, box6.size() / 2);
         ctx.waitTicks(10);
 
         boolean doneHalf = ctx.computeOnClient(mc -> PlannerSession.INSTANCE.getProject().isBoxDone(PlannerSession.INSTANCE.getPlan().getBoxes().get(5)));
         int targetHalf = ctx.computeOnClient(mc -> PlannerSession.INSTANCE.getCurrentBox().getIndex());
         log("Half filled: assistant target #%d, done=%s", targetHalf, doneHalf);
-        check(targetHalf == 6, "the assistant should recognize the partially filled box #6");
+        check(targetHalf == 6, "the assistant should stay linked to box #6");
         check(doneHalf == false, "a half filled box must not be marked as done");
 
         int halfCount = 0;
@@ -270,8 +275,8 @@ public class ShulkerPlannerClientGameTest implements FabricClientGameTest
         sp.getServer().runCommand("clear @a");
         ctx.runOnClient(mc -> {
             PlannerProject project = PlannerSession.INSTANCE.getProject();
-            PlannerSession.INSTANCE.setFocusedBox(2);
             List<PlannedBox> boxes = PlannerSession.INSTANCE.getPlan().getBoxes();
+            PlannerSession.INSTANCE.setFollowedBox(boxes.get(2));
             ItemStack partial = BoxItemFactory.createBoxItem(project, boxes.get(2), boxes.size());
             List<ItemStack> half = new ArrayList<>();
 
@@ -281,6 +286,12 @@ public class ShulkerPlannerClientGameTest implements FabricClientGameTest
             }
 
             partial.set(DataComponents.CONTAINER, ItemContainerContents.fromItems(half));
+            var binding = new it.marco.shulkerplanner.data.ShulkerBinding(
+                    boxes.get(2).getId(),
+                    it.marco.shulkerplanner.util.InventoryScanner.getId(partial),
+                    it.marco.shulkerplanner.util.InventoryScanner.getCustomName(partial));
+            binding.setContents(it.marco.shulkerplanner.util.InventoryScanner.getShulkerContents(partial));
+            PlannerSession.INSTANCE.link(boxes.get(2), binding);
             BoxItemFactory.giveToPlayer(partial);
         });
         // Let the creative slot packet arrive first, the give command could otherwise use the same slot
@@ -678,8 +689,9 @@ public class ShulkerPlannerClientGameTest implements FabricClientGameTest
         ctx.waitTicks(30);
 
         int focus = ctx.computeOnClient(mc -> {
-            int index = PlannerSession.INSTANCE.getPlan().getBoxes().size() - 3;
-            PlannerSession.INSTANCE.setFocusedBox(index);
+            List<PlannedBox> boxes = PlannerSession.INSTANCE.getPlan().getBoxes();
+            int index = boxes.size() - 3;
+            PlannerSession.INSTANCE.setFollowedBox(boxes.get(index));
             return index;
         });
 
@@ -693,6 +705,12 @@ public class ShulkerPlannerClientGameTest implements FabricClientGameTest
 
         ctx.runOnClient(mc -> GuiBase.openGui(PlannerGuis.create(PlannerTab.BOXES, null)));
         shot(ctx, "07_boxes_progress");
+
+        ctx.runOnClient(mc -> GuiBase.openGui(PlannerGuis.create(PlannerTab.RAW, null)));
+        shot(ctx, "07b_raw_materials");
+
+        ctx.runOnClient(mc -> GuiBase.openGui(PlannerGuis.create(PlannerTab.SETTINGS, null)));
+        shot(ctx, "07c_settings");
 
         // Packing assistant on a real placed shulker box, half filled and with a wrong item
         BlockPos pos = sp.getServer().computeOnServer(server -> {

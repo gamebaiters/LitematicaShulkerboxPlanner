@@ -1,7 +1,10 @@
 package it.marco.shulkerplanner.plan;
 
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import javax.annotation.Nullable;
 
 /**
  * The result of packing a list of item requirements into shulker boxes.
@@ -46,6 +49,38 @@ public class ShulkerPlan
     public List<PlannedBox> getBoxes()
     {
         return this.boxes;
+    }
+
+    /**
+     * @return the box with the given stable id, or null
+     */
+    @Nullable
+    public PlannedBox getBoxById(int id)
+    {
+        for (PlannedBox box : this.boxes)
+        {
+            if (box.getId() == id)
+            {
+                return box;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return the total of every item over all the boxes (spare stacks included)
+     */
+    public Map<String, Long> getPackedTotals()
+    {
+        Map<String, Long> map = new LinkedHashMap<>();
+
+        for (PlannedBox box : this.boxes)
+        {
+            box.getTotals().forEach((id, count) -> map.merge(id, (long) count, Long::sum));
+        }
+
+        return map;
     }
 
     /**
