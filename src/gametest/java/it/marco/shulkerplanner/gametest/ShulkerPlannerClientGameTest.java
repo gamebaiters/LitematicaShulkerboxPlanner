@@ -1121,6 +1121,22 @@ public class ShulkerPlannerClientGameTest implements FabricClientGameTest
         check(ctx.computeOnClient(mc -> mc.player.containerMenu.getCarried().isEmpty()), "the picked up item was not put back");
         input.setCursorPos(2, 2);
         ctx.waitTicks(2);
+
+        if (ctx.computeOnClient(mc -> it.marco.shulkerplanner.compat.JeiCompat.isAvailable()))
+        {
+            input.setCursorPos((b3[0] + 18.0) * scale, (b3[1] + 44.0) * scale);
+            ctx.waitTicks(2);
+            check(ctx.computeOnClient(mc -> PackingAssistant.getHoveredItem(b3[0] + 18.0, b3[1] + 44.0) != null),
+                  "hovering an item row in the panel did not expose a JEI clickable item");
+            input.pressMouse(InputConstants.MOUSE_BUTTON_LEFT);
+            ctx.waitTicks(5);
+            check(ctx.computeOnClient(mc -> (mc.gui.screen() instanceof ShulkerBoxScreen) == false),
+                  "clicking an item row in the panel did not open JEI");
+            input.pressKey(InputConstants.KEY_ESCAPE);
+            ctx.waitTicks(3);
+            ctx.waitForScreen(ShulkerBoxScreen.class);
+            log("Real click on item row opened and closed JEI");
+        }
     }
 
     // ------------------------------------------------------------------ layout: nothing overlaps, at every GUI scale
@@ -1332,6 +1348,11 @@ public class ShulkerPlannerClientGameTest implements FabricClientGameTest
         shot(ctx, "check_link_linked");
         ctx.runOnClient(mc -> mc.player.closeContainer());
         ctx.waitTicks(5);
+        ctx.runOnClient(mc -> {
+            PlannedBox cur = PlannerSession.INSTANCE.getCurrentBox();
+            check(cur != null && cur.getIndex() == 2,
+                  "the in-game HUD should stay on the last opened linked box #2, got " + (cur != null ? cur.getIndex() : "null"));
+        });
 
         int current = ctx.computeOnClient(mc -> PlannerSession.INSTANCE.getCurrentBox().getIndex());
         check(current == 2, "the linked box being filled should be the current box, is #" + current);

@@ -16,7 +16,8 @@
 	"environment": "client",
 	"entrypoints": {
 		"client": ["it.marco.shulkerplanner.ShulkerPlanner"],
-		"modmenu": ["it.marco.shulkerplanner.compat.ModMenuImpl"]
+		"modmenu": ["it.marco.shulkerplanner.compat.ModMenuImpl"],
+		"jei_mod_plugin": ["it.marco.shulkerplanner.compat.JeiPluginImpl"]
 	},
 	"mixins": ["shulkerplanner.mixins.json"],
 	"depends": {

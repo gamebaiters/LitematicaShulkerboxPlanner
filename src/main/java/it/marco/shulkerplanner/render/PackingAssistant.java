@@ -23,6 +23,7 @@ import fi.dy.masa.malilib.gui.GuiBase;
 import fi.dy.masa.malilib.render.GuiContext;
 import fi.dy.masa.malilib.util.StringUtils;
 
+import it.marco.shulkerplanner.compat.JeiCompat;
 import it.marco.shulkerplanner.config.Configs;
 import it.marco.shulkerplanner.data.MaterialRow;
 import it.marco.shulkerplanner.data.PlannerProject;
@@ -113,6 +114,11 @@ public class PackingAssistant
     private static int dragStartW;
     private static int dragStartH;
     private static int dragStartScroll;
+    @Nullable private static HoveredItem hoveredItem;
+
+    public record HoveredItem(ItemStack stack, int x, int y, int w, int h)
+    {
+    }
 
     private record Button(int x, int y, int w, int h, Runnable action)
     {
@@ -170,7 +176,7 @@ public class PackingAssistant
         shownBoxId = -1;
         drag = Drag.NONE;
         pressedInPanel = false;
-        PlannerSession.INSTANCE.setOpenBox(-1);
+        hoveredItem = null;
     }
 
     /**
@@ -185,6 +191,7 @@ public class PackingAssistant
                 Configs.saveToFile();
             }
 
+            PlannerSession.INSTANCE.refreshInventory(true);
             PlannerSession.INSTANCE.save();
             reset(null);
         }
@@ -192,8 +199,9 @@ public class PackingAssistant
 
     /**
      * @return the box suggested for an unlinked shulker box: the followed box, the first box still to fill
-     * that has no shulker box linked yet
+     * that has no shulker box linked yet, or null if every box is already linked
      */
+    @Nullable
     private static PlannedBox suggestBox(ShulkerPlan plan, Map<String, Integer> contents)
     {
         PlannerSession session = PlannerSession.INSTANCE;
@@ -227,7 +235,30 @@ public class PackingAssistant
             }
         }
 
-        return plan.getBoxes().getFirst();
+        for (PlannedBox box : plan.getBoxes())
+        {
+            if (session.getBinding(box) == null)
+            {
+                return box;
+            }
+        }
+
+        return null;
+    }
+
+    private static List<PlannedBox> unlinkedBoxes(ShulkerPlan plan, PlannerSession session)
+    {
+        List<PlannedBox> result = new ArrayList<>();
+
+        for (PlannedBox box : plan.getBoxes())
+        {
+            if (session.getBinding(box) == null)
+            {
+                result.add(box);
+            }
+        }
+
+        return result;
     }
 
     /**
@@ -247,6 +278,7 @@ public class PackingAssistant
         }
 
         buttons.clear();
+        hoveredItem = null;
 
         if (isActive(screen) == false)
         {
@@ -284,7 +316,7 @@ public class PackingAssistant
             {
                 PlannedBox suggestion = suggestBox(plan, contents);
 
-                if (session.getBinding(suggestion) == null)
+                if (suggestion != null && session.getBinding(suggestion) == null)
                 {
                     link(suggestion, contents);
                 }
@@ -314,13 +346,11 @@ public class PackingAssistant
         {
             target = plan.getBoxById(previewId);
 
-            if (target == null)
+            if (target == null || session.getBinding(target) != null)
             {
                 target = suggestBox(plan, contents);
-                previewId = target.getId();
+                previewId = target != null ? target.getId() : -1;
             }
-
-            session.setOpenBox(-1);
         }
         else
         {
@@ -334,9 +364,18 @@ public class PackingAssistant
             }
         }
 
+        if (target == null)
+        {
+            anchorLeft = leftPos;
+            anchorTop = topPos;
+            anchorWidth = imageWidth;
+            drawAllLinkedPanel(screen, ctx, mouseX, mouseY, plan);
+            return;
+        }
+
         Map<String, Integer> planned = target.getTotals();
         boolean complete = contents.equals(new HashMap<>(planned));
-        BoxState state = session.getBoxState(target);
+        BoxState state = linked ? session.getBoxState(target) : BoxState.TODO;
 
         if (linked && complete && state != BoxState.DONE && initialSignature != null &&
             signature.equals(initialSignature) == false && Configs.Generic.AUTO_MARK_BOXES.getBooleanValue())
@@ -435,6 +474,19 @@ public class PackingAssistant
         return panelVisible && Ui.inside(mouseX, mouseY, panelX, panelY, panelW, panelH);
     }
 
+    @Nullable
+    public static HoveredItem getHoveredItem(double mouseX, double mouseY)
+    {
+        HoveredItem item = hoveredItem;
+
+        if (item != null && panelVisible && Ui.inside(mouseX, mouseY, item.x(), item.y(), item.w(), item.h()))
+        {
+            return item;
+        }
+
+        return null;
+    }
+
     /**
      * Saves where the panel is, relative to the container screen it's anchored to
      */
@@ -468,6 +520,86 @@ public class PackingAssistant
         }
 
         return lines;
+    }
+
+    private static void drawAllLinkedPanel(AbstractContainerScreen<?> screen, GuiContext ctx, int mouseX, int mouseY, ShulkerPlan plan)
+    {
+        int sw = screen.width;
+        int sh = screen.height;
+        int containerRight = anchorLeft + anchorWidth;
+        int side = Configs.Generic.ASSISTANT_SIDE.getIntegerValue();
+        int gap = Configs.Generic.ASSISTANT_GAP.getIntegerValue();
+
+        if (side != SIDE_RIGHT && side != SIDE_LEFT)
+        {
+            int spaceRight = sw - containerRight - 6;
+            int spaceLeft = anchorLeft - 6;
+            side = spaceRight >= MIN_WIDTH || spaceRight >= spaceLeft ? SIDE_RIGHT : SIDE_LEFT;
+            gap = 4;
+        }
+
+        int space = side == SIDE_RIGHT ? sw - containerRight - gap - 2 : anchorLeft - gap - 2;
+        int w = Configs.Generic.ASSISTANT_WIDTH.getIntegerValue();
+
+        if (w <= 0)
+        {
+            w = Math.max(MIN_WIDTH, Math.min(DEFAULT_WIDTH, space));
+        }
+
+        w = Math.max(MIN_WIDTH, Math.min(w, sw - 4));
+        int h = TITLE_HEIGHT + 34;
+
+        if (drag == Drag.RESIZE)
+        {
+            w = panelW;
+            h = Math.max(h, panelH);
+        }
+
+        int x = drag == Drag.MOVE || drag == Drag.RESIZE ? panelX : (side == SIDE_RIGHT ? containerRight + gap : anchorLeft - gap - w);
+        int y = drag == Drag.MOVE || drag == Drag.RESIZE ? panelY : anchorTop + Configs.Generic.ASSISTANT_OFFSET_Y.getIntegerValue();
+        x = Math.max(2, Math.min(x, sw - w - 2));
+        y = Math.max(2, Math.min(y, sh - h - 2));
+        panelX = x;
+        panelY = y;
+        panelW = w;
+        panelH = h;
+        panelVisible = true;
+        listX = 0;
+        listY = 0;
+        listW = 0;
+        listH = 0;
+        contentHeight = 0;
+
+        int alpha = Math.round(255 * Configs.Generic.ASSISTANT_OPACITY.getIntegerValue() / 100f);
+        Ui.framed(ctx, x, y, w, h, Theme.withAlpha(0x140F1C, alpha), Theme.withAlpha(Theme.BORDER_STRONG, Math.max(alpha, 0xC0)));
+        Ui.gradient(ctx, x + 1, y + 1, w - 2, TITLE_HEIGHT - 1, Theme.withAlpha(Theme.BORDER_STRONG, Math.min(255, alpha / 2 + 0x40)),
+                    Theme.withAlpha(0x2B2238, Math.min(255, alpha + 0x20)));
+        Ui.hline(ctx, x + 1, y + TITLE_HEIGHT, w - 2, Theme.withAlpha(Theme.BORDER_STRONG, 0x90));
+
+        int tx = x + PAD;
+        int right = x + w - PAD;
+        boolean overTitle = Ui.inside(mouseX, mouseY, x, y, w, TITLE_HEIGHT) && drag == Drag.NONE;
+        Ui.dragHandle(ctx, tx, y + 6, overTitle || drag == Drag.MOVE ? Theme.TEXT : Theme.TEXT_MUTED);
+        Ui.item(ctx, new ItemStack(Items.SHULKER_BOX), tx + 8, y + 4, 12, false);
+
+        int small = 14;
+        int resetX = right - small;
+        boolean hoverReset = Ui.inside(mouseX, mouseY, resetX, y + 3, small, small) && drag == Drag.NONE;
+        Ui.button3d(ctx, resetX, y + 3, small, small, hoverReset ? Ui.BEVEL_QUIET.hovered() : Ui.BEVEL_QUIET, false);
+        Ui.resetIcon(ctx, resetX + 4, y + 5, hoverReset ? Theme.TEXT : Theme.TEXT_DIM);
+        buttons.add(new Button(resetX, y + 3, small, small, () -> {
+            resetGeometry();
+            scroll = 0;
+        }));
+
+        String title = StringUtils.translate("shulkerplanner.gui.tab.boxes") + " (" + plan.getBoxCount() + ")";
+        Ui.textShadow(ctx, Ui.trim(title, resetX - 4 - (tx + 24)), tx + 24, y + 7, Theme.TEXT);
+        Ui.text(ctx, Ui.trim(StringUtils.translate("shulkerplanner.assistant.all_linked"), w - 2 * PAD), tx, y + TITLE_HEIGHT + 10, Theme.TEXT_DIM);
+
+        if (drag == Drag.NONE && hoverReset)
+        {
+            Ui.tooltip(ctx, mouseX, mouseY, List.of(StringUtils.translate("shulkerplanner.assistant.hover.reset")));
+        }
     }
 
     private static void drawPanel(AbstractContainerScreen<?> screen, GuiContext ctx, int mouseX, int mouseY, int imageHeight,
@@ -646,7 +778,7 @@ public class PackingAssistant
         int chipFg;
         int chipBg;
 
-        if (state == BoxState.DONE)
+        if (linked && state == BoxState.DONE)
         {
             chip = "✔ " + StringUtils.translate("shulkerplanner.assistant.state.done");
             chipFg = Theme.SUCCESS;
@@ -714,6 +846,15 @@ public class PackingAssistant
                     hoveredId = row.id();
                     hoveredWant = row.want();
                     hoveredHave = row.have();
+
+                    if (row.id() != null)
+                    {
+                        ItemRequirement req = target.getItems().get(row.id());
+                        ItemStack stack = req != null ? req.proto() : new MaterialRow(row.id(), 0, 0).getStack();
+                        int clipTop = Math.max(ry, listY);
+                        int clipBottom = Math.min(ry + row.height(), listY + listH);
+                        hoveredItem = new HoveredItem(stack, listX, clipTop, listW, Math.max(1, clipBottom - clipTop));
+                    }
                 }
 
                 drawRow(ctx, screen.getMenu(), row, target, ry);
@@ -775,9 +916,9 @@ public class PackingAssistant
         int by = ty;
         int flowRight = right - GRIP;
         List<Runnable> actions = new ArrayList<>();
-        List<PlannedBox> boxes = plan.getBoxes();
-        int index = boxes.indexOf(target);
-        int count = boxes.size();
+        List<PlannedBox> unlinked = unlinkedBoxes(plan, session);
+        int index = unlinked.indexOf(target);
+        int count = unlinked.size();
         PlannedBox shown = target;
         BoxState shownState = state;
 
@@ -788,8 +929,8 @@ public class PackingAssistant
         }
         else
         {
-            actions.add(() -> previewId = boxes.get(Math.floorMod(index - 1, count)).getId());
-            actions.add(() -> previewId = boxes.get(Math.floorMod(index + 1, count)).getId());
+            actions.add(count > 1 ? () -> previewId = unlinked.get(Math.floorMod(index - 1, count)).getId() : null);
+            actions.add(count > 1 ? () -> previewId = unlinked.get(Math.floorMod(index + 1, count)).getId() : null);
             actions.add(canLink ? () -> link(shown, contents) : null);
         }
 
@@ -945,6 +1086,11 @@ public class PackingAssistant
             lines.add(GuiBase.TXT_GRAY + StringUtils.translate("shulkerplanner.assistant.in_inventory", Format.number(countInPlayerSlots(menu, id))));
         }
 
+        if (JeiCompat.isAvailable())
+        {
+            lines.add(GuiBase.TXT_DARK_GRAY + StringUtils.translate("shulkerplanner.assistant.hover.jei"));
+        }
+
         Ui.tooltip(ctx, mouseX, mouseY, lines);
     }
 
@@ -1046,6 +1192,18 @@ public class PackingAssistant
         pressedInPanel = true;
 
         // Minecraft 26.3 numbers the mouse buttons like SDL: left is 1 (InputConstants.MOUSE_BUTTON_LEFT), not GLFW's 0
+        if (button == InputConstants.MOUSE_BUTTON_RIGHT)
+        {
+            HoveredItem item = getHoveredItem(mouseX, mouseY);
+
+            if (item != null && JeiCompat.isAvailable() && JeiCompat.showUses(item.stack()))
+            {
+                playClick();
+            }
+
+            return true;
+        }
+
         if (button != InputConstants.MOUSE_BUTTON_LEFT)
         {
             return true;
@@ -1085,6 +1243,15 @@ public class PackingAssistant
             scroll = (int) Math.round(Math.max(0, Math.min(1, f)) * getMaxScroll());
             dragStartScroll = scroll;
             drag = Drag.SCROLLBAR;
+        }
+        else
+        {
+            HoveredItem item = getHoveredItem(mouseX, mouseY);
+
+            if (item != null && JeiCompat.isAvailable() && JeiCompat.showRecipes(item.stack()))
+            {
+                playClick();
+            }
         }
 
         return true;

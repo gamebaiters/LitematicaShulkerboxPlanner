@@ -338,6 +338,8 @@
     "shulkerplanner.assistant.hover.in_box": "In the box: %s / %s (%s)",
     "shulkerplanner.assistant.hover.wrong": "Not part of this box: %s to remove",
     "shulkerplanner.assistant.already_linked": "Phase already linked to another box",
+    "shulkerplanner.assistant.all_linked": "All phases are linked to other boxes",
+    "shulkerplanner.assistant.hover.jei": "Click / R: JEI recipes  ·  Right-click / U: uses",
     "shulkerplanner.message.box_complete": "Shulker box #%s complete!",
     "shulkerplanner.message.hold_shift_to_unlink": "Hold Shift to unlink the shulker box",
     "shulkerplanner.message.plan_locked": "Plan locked: you can now link your shulker boxes",

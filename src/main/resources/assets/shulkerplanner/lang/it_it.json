@@ -338,6 +338,8 @@
     "shulkerplanner.assistant.hover.in_box": "Nella shulker: %s / %s (%s)",
     "shulkerplanner.assistant.hover.wrong": "Non fa parte di questa fase: %s da togliere",
     "shulkerplanner.assistant.already_linked": "Questa fase ha già un'altra shulker",
+    "shulkerplanner.assistant.all_linked": "Tutte le fasi sono già collegate ad altre shulker",
+    "shulkerplanner.assistant.hover.jei": "Click / R: ricette JEI  ·  Click dx / U: usi",
     "shulkerplanner.message.box_complete": "Shulker #%s completata!",
     "shulkerplanner.message.hold_shift_to_unlink": "Tieni premuto Shift per scollegare la shulker",
     "shulkerplanner.message.plan_locked": "Piano bloccato: ora puoi collegare le tue shulker box",

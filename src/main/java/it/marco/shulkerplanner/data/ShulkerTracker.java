@@ -185,6 +185,10 @@ public class ShulkerTracker
                 pos = this.lastUsePos;
                 itemId = BuiltInRegistries.ITEM.getKey(state.getBlock().asItem()).toString();
             }
+
+            this.lastUsePos = null;
+            this.lastUseDim = null;
+            this.lastUseTime = 0;
         }
 
         String name = title.getString();

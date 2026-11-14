@@ -728,6 +728,7 @@ public class PlannerSession implements IClientTickHandler
         {
             this.project.setFollowedBoxId(box != null ? box.getId() : -1);
             this.save();
+            this.notifyUpdate();
         }
     }
 
@@ -751,7 +752,7 @@ public class PlannerSession implements IClientTickHandler
         ShulkerPlan plan = this.getPlan();
         PlannedBox followed = plan.getBoxById(this.project.getFollowedBoxId());
 
-        if (followed != null && this.isBoxReady(followed) == false)
+        if (followed != null && this.isBoxDone(followed) == false)
         {
             return followed;
         }
