@@ -291,6 +291,11 @@ public class PlannerSession implements IClientTickHandler
         {
             InfoUtils.showGuiOrInGameMessage(MessageType.SUCCESS, 4000, "shulkerplanner.message.plan_follows_list", changed);
         }
+        else if (this.litematicaIgnored.isEmpty() == false && Configs.Generic.RESPECT_LITEMATICA_IGNORED.getBooleanValue() == false)
+        {
+            // Items ignored in Litematica, but the option to leave them out is off: say so instead of nothing
+            InfoUtils.showGuiOrInGameMessage(MessageType.WARNING, 8000, "shulkerplanner.message.ignored_not_respected");
+        }
         else if (newCounts)
         {
             InfoUtils.showGuiOrInGameMessage(MessageType.INFO, 3000, "shulkerplanner.message.list_no_changes");

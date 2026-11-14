@@ -347,6 +347,7 @@
     "shulkerplanner.message.plan_updated": "Piano aggiornato alle nuove quantità",
     "shulkerplanner.message.plan_follows_list": "Lista shulker aggiornata dalla lista materiali (%s item cambiati)",
     "shulkerplanner.message.list_no_changes": "Lista materiali aggiornata: le shulker non cambiano",
+    "shulkerplanner.message.ignored_not_respected": "Gli item ignorati in Litematica restano nelle shulker: attiva «Rispetta blocchi ignorati Litematica» nelle Impostazioni del planner",
     "shulkerplanner.hotkeys.category.generic": "Hotkey",
     "shulkerplanner.config.generic.name.hudEnabled": "hudEnabled",
     "shulkerplanner.config.generic.prettyName.hudEnabled": "HUD",

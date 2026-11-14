@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.1.5 - Minecraft 26.3
+
+- *Respect Litematica ignored* (Settings) now applies at once when it's turned on or off, also to a locked plan. Before, the change only showed after the next material list import.
+- Ignoring an item in Litematica's material list while that option is off now says so ("Items ignored in Litematica stay in the shulker boxes: turn on ..."), instead of silently keeping the item.
+- The game test now follows the real path with the real mouse: planner, *Material list*, *Ignore* on a row, Litematica's *Refresh*, back to the planner, *Refresh materials*. It covers a draft plan, a locked plan, a locked plan with the box being filled, and the option off.
+
 ## 2.1.4 - Minecraft 26.3
 
 **The shulker boxes follow the material list, every time**

@@ -398,6 +398,7 @@ t("message.plan_reset", "Piano sbloccato e azzerato", "Plan unlocked and reset")
 t("message.plan_updated", "Piano aggiornato alle nuove quantità", "Plan updated to the new material counts")
 t("message.plan_follows_list", "Lista shulker aggiornata dalla lista materiali (%s item cambiati)", "Shulker boxes updated from the material list (%s items changed)")
 t("message.list_no_changes", "Lista materiali aggiornata: le shulker non cambiano", "Material list refreshed: the shulker boxes stay the same")
+t("message.ignored_not_respected", "Gli item ignorati in Litematica restano nelle shulker: attiva «Rispetta blocchi ignorati Litematica» nelle Impostazioni del planner", "Items ignored in Litematica stay in the shulker boxes: turn on \"Respect Litematica ignored\" in the planner's Settings")
 
 # Config
 t("hotkeys.category.generic", "Hotkey", "Hotkeys")

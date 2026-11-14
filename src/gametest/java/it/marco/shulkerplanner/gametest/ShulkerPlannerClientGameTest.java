@@ -1,6 +1,7 @@
 package it.marco.shulkerplanner.gametest;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -117,11 +118,20 @@ public class ShulkerPlannerClientGameTest implements FabricClientGameTest
             // LSP_ONLY=layout: only the screenshots, the layout and the assistant panel checks
             boolean layoutOnly = "layout".equals(System.getenv("LSP_ONLY"));
 
+            // LSP_ONLY=ignore: only the ignore flow of Litematica's material list
+            if ("ignore".equals(System.getenv("LSP_ONLY")))
+            {
+                this.ignoreFlowChecks(ctx, sp);
+                log("ALL CHECKS PASSED");
+                return;
+            }
+
             if (layoutOnly == false)
             {
                 this.functionalChecks(ctx, sp);
                 this.placementSelectionChecks(ctx, sp);
                 this.linkingChecks(ctx, sp);
+                this.ignoreFlowChecks(ctx, sp);
             }
 
             this.showcase(ctx, sp);
@@ -1542,6 +1552,330 @@ public class ShulkerPlannerClientGameTest implements FabricClientGameTest
         sp.getServer().runCommand("clear @a");
         ctx.waitTicks(5);
         log("Links: all checks passed");
+    }
+
+    // ------------------------------------------------------------------ ignoring an entry in Litematica's material list, real mouse
+
+    private static final String GRASS = "minecraft:grass_block";
+
+    private void ignoreFlowChecks(ClientGameTestContext ctx, TestSingleplayerContext sp)
+    {
+        BlockPos base = sp.getServer().computeOnServer(server -> server.getPlayerList().getPlayers().getFirst().blockPosition());
+        int x = base.getX() + 20;
+        int y = base.getY();
+        int z = base.getZ() - 30;
+        sp.getServer().runCommand(String.format("fill %d %d %d %d %d %d grass_block", x, y, z, x + 11, y + 1, z + 11));
+        sp.getServer().runCommand(String.format("fill %d %d %d %d %d %d stone_bricks", x, y + 2, z, x + 3, y + 3, z + 3));
+        sp.getServer().runCommand(String.format("fill %d %d %d %d %d %d glass", x + 5, y + 2, z + 5, x + 7, y + 2, z + 7));
+        ctx.waitTicks(20);
+
+        MaterialListBase list = ctx.computeOnClient(mc -> {
+            var manager = DataManager.getSchematicPlacementManager();
+            var schematic = createSchematic(mc, "Ignore Test", new BlockPos(x, y, z), new BlockPos(x + 11, y + 3, z + 11));
+            manager.addSchematicPlacement(SchematicPlacement.createFor(schematic, new BlockPos(x, y + 40, z), "Ignore Test", true, true), false);
+            selectPlacement("Ignore Test");
+            SchematicPlacement placement = manager.getSelectedSchematicPlacement();
+            MaterialListBase l = placement.getMaterialList();
+            log("IGN placement.getMaterialList() = %s", l);
+            DataManager.setMaterialList(l);
+            l.reCreateMaterialList();
+            return l;
+        });
+        ctx.waitFor(mc -> list.getMaterialsAll().isEmpty() == false, 400);
+        ctx.waitTicks(5);
+        String counted = ctx.computeOnClient(mc -> {
+            StringBuilder sb = new StringBuilder();
+            list.getMaterialsAll().forEach(e -> sb.append(BuiltInRegistries.ITEM.getKey(e.getStack().getItem())).append('=').append(e.getCountTotal()).append(' '));
+            return sb.toString();
+        });
+        log("IGN counted: %s", counted);
+
+        String[] cases = { "A draft", "B locked", "C locked+filling" };
+
+        for (int c = 0; c < cases.length; ++c)
+        {
+            String name = cases[c];
+            int cs = c;
+            log("IGN ===== case %s =====", name);
+            ctx.runOnClient(mc -> {
+                list.clearIgnored();
+                PlannerGuis.openForMaterialList(list, null);
+            });
+            ctx.waitTicks(10);
+            ctx.runOnClient(mc -> {
+                PlannerSession session = PlannerSession.INSTANCE;
+
+                if (cs >= 1)
+                {
+                    session.lockPlan();
+                }
+
+                if (cs == 2)
+                {
+                    for (PlannedBox box : session.getPlan().getBoxes())
+                    {
+                        if (box.getTotals().containsKey(GRASS))
+                        {
+                            session.setBoxState(box, BoxState.FILLING);
+                            break;
+                        }
+                    }
+                }
+            });
+            ctx.waitTicks(10);
+            String planText = ctx.computeOnClient(mc -> describePlan());
+            log("IGN [%s] plan: %s", name, planText);
+            ignoreDiag(ctx, name + " start");
+            check(ctx.computeOnClient(mc -> PlannerSession.INSTANCE.getPlan().getPackedTotals().containsKey(GRASS)),
+                  "case " + name + ": grass_block should be in the plan before ignoring it");
+            shot(ctx, "ignore_" + c + "_0_planner");
+
+            // a. planner -> Litematica's material list, real click
+            realClickButton(ctx, StringUtilsT("shulkerplanner.gui.button.open_material_list"));
+            ctx.waitTicks(8);
+            check(ctx.computeOnClient(mc -> mc.gui.screen() instanceof GuiMaterialList), "case " + name + ": the Material list button did not open Litematica's material list, screen is "
+                  + ctx.computeOnClient(mc -> String.valueOf(mc.gui.screen())));
+
+            // b. Ignore on the grass_block row
+            int[] pos = ctx.computeOnClient(mc -> findIgnoreButton((GuiBase) mc.gui.screen(), "grass_block"));
+            log("IGN [%s] ignore button of grass_block at gui %d,%d", name, pos[0], pos[1]);
+            realClickAt(ctx, pos[0], pos[1]);
+            ctx.waitTicks(8);
+            shot(ctx, "ignore_" + c + "_1_ignored");
+            ignoreDiag(ctx, name + " after Ignore");
+            checkIgnored(ctx, name + " after Ignore");
+
+            // d. Litematica's Refresh
+            Object before = ctx.computeOnClient(mc -> System.identityHashCode(list.getMaterialsAll()));
+            realClickButton(ctx, ctx.computeOnClient(mc -> litematicaLabel("REFRESH_LIST")));
+            ctx.waitTicks(5);
+            ctx.waitFor(mc -> PlannerSession.INSTANCE.isWaitingForMaterialList() == false
+                              && Integer.valueOf(System.identityHashCode(list.getMaterialsAll())).equals(before) == false, 400);
+            ctx.waitTicks(5);
+            shot(ctx, "ignore_" + c + "_2_refreshed");
+            ignoreDiag(ctx, name + " after Litematica Refresh");
+            checkIgnored(ctx, name + " after Litematica Refresh");
+
+            // e. back to the planner, its own Refresh
+            ctx.getInput().pressKey(InputConstants.KEY_ESCAPE);
+            ctx.waitTicks(8);
+            String scr = ctx.computeOnClient(mc -> String.valueOf(mc.gui.screen()));
+            log("IGN [%s] screen after Escape: %s", name, scr);
+            check(isPlannerOpen(ctx), "case " + name + ": Escape did not go back to the planner");
+            Object before2 = ctx.computeOnClient(mc -> System.identityHashCode(list.getMaterialsAll()));
+            realClickButton(ctx, StringUtilsT("shulkerplanner.gui.button.refresh_materials"));
+            ctx.waitTicks(5);
+            ctx.waitFor(mc -> PlannerSession.INSTANCE.isWaitingForMaterialList() == false
+                              && Integer.valueOf(System.identityHashCode(list.getMaterialsAll())).equals(before2) == false, 400);
+            ctx.waitTicks(5);
+            shot(ctx, "ignore_" + c + "_3_planner_refreshed");
+            ignoreDiag(ctx, name + " after planner Refresh");
+            checkIgnored(ctx, name + " after planner Refresh");
+        }
+
+        // Case D: "Respect Litematica ignored" turned off. Ignoring keeps grass (as the option says, with a warning),
+        // turning the option back on takes it out of the locked plan at once.
+        log("IGN ===== case D option off =====");
+        ctx.runOnClient(mc -> {
+            list.clearIgnored();
+            PlannerGuis.openForMaterialList(list, null);
+            PlannerSession.INSTANCE.lockPlan();
+            Configs.Generic.RESPECT_LITEMATICA_IGNORED.setBooleanValue(false);
+        });
+        ctx.waitTicks(10);
+        realClickButton(ctx, StringUtilsT("shulkerplanner.gui.button.open_material_list"));
+        ctx.waitTicks(8);
+        int[] posD = ctx.computeOnClient(mc -> findIgnoreButton((GuiBase) mc.gui.screen(), "grass_block"));
+        realClickAt(ctx, posD[0], posD[1]);
+        ctx.waitTicks(8);
+        shot(ctx, "ignore_3_option_off_warning");
+        ignoreDiag(ctx, "D option off, after Ignore");
+        check(ctx.computeOnClient(mc -> PlannerSession.INSTANCE.getPlan().getPackedTotals().containsKey(GRASS)),
+              "case D: with the option off an ignored item stays in the plan");
+        ctx.getInput().pressKey(InputConstants.KEY_ESCAPE);
+        ctx.waitTicks(8);
+        ctx.runOnClient(mc -> Configs.Generic.RESPECT_LITEMATICA_IGNORED.setBooleanValue(true));
+        ctx.waitTicks(5);
+        ignoreDiag(ctx, "D option back on");
+        checkIgnored(ctx, "D option back on");
+        check(ctx.computeOnClient(mc -> PlannerSession.INSTANCE.isPlanOutdated()) == false,
+              "case D: turning the option on must update the locked plan at once");
+
+        ctx.runOnClient(mc -> {
+            list.clearIgnored();
+            mc.gui.setScreen(null);
+        });
+        log("Ignore flow: all checks passed");
+    }
+
+    private static String StringUtilsT(String key)
+    {
+        return fi.dy.masa.malilib.util.StringUtils.translate(key);
+    }
+
+    private static void checkIgnored(ClientGameTestContext ctx, String when)
+    {
+        boolean inPlan = ctx.computeOnClient(mc -> PlannerSession.INSTANCE.getPlan().getPackedTotals().containsKey(GRASS));
+        boolean listed = ctx.computeOnClient(mc -> PlannerSession.INSTANCE.getListedCounts().containsKey(GRASS));
+        check(inPlan == false, "[" + when + "] grass_block is still in the plan's packed totals although it is ignored in Litematica");
+        check(listed == false, "[" + when + "] getListedCounts() still contains grass_block although it is ignored in Litematica");
+    }
+
+    private static void ignoreDiag(ClientGameTestContext ctx, String when)
+    {
+        String text = ctx.computeOnClient(mc -> {
+            PlannerSession s = PlannerSession.INSTANCE;
+            MaterialListBase l = s.getMaterialList();
+            Object ign;
+
+            try
+            {
+                ign = ((it.marco.shulkerplanner.mixin.IMixinMaterialListBase) l).shulkerplanner_getIgnored().stream()
+                        .map(e -> BuiltInRegistries.ITEM.getKey(e.getStack().getItem()).toString()).toList();
+            }
+            catch (Exception e)
+            {
+                ign = "n/a " + e;
+            }
+
+            return String.format("class=%s same=%s ignoredSet=%s isIgnored=%s listed=%s required=%s packed=%s locked=%s outdated=%s waiting=%s all=%d screen=%s",
+                    l.getClass().getSimpleName(), l == s.getMaterialList(), ign, s.isIgnoredInLitematica(GRASS),
+                    s.getListedCounts().get(GRASS), s.getRequiredCounts().get(GRASS), s.getPlan().getPackedTotals().get(GRASS),
+                    s.isPlanLocked(), s.isPlanOutdated(), s.isWaitingForMaterialList(), l.getMaterialsAll().size(),
+                    mc.gui.screen() == null ? "null" : mc.gui.screen().getClass().getSimpleName());
+        });
+        log("IGN [%s] %s", when, text);
+    }
+
+    private static String litematicaLabel(String type)
+    {
+        try
+        {
+            Class<?> c = Class.forName("fi.dy.masa.litematica.gui.GuiMaterialList$ButtonListener$Type");
+
+            for (Object o : c.getEnumConstants())
+            {
+                if (((Enum<?>) o).name().equals(type))
+                {
+                    return (String) c.getMethod("getDisplayName", Object[].class).invoke(o, (Object) new Object[0]);
+                }
+            }
+        }
+        catch (ReflectiveOperationException e)
+        {
+            throw new RuntimeException(e);
+        }
+
+        throw new AssertionError("no button type " + type);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<ButtonBase> screenButtons(GuiBase gui)
+    {
+        try
+        {
+            Field f = GuiBase.class.getDeclaredField("buttons");
+            f.setAccessible(true);
+            return (List<ButtonBase>) f.get(gui);
+        }
+        catch (ReflectiveOperationException e)
+        {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static String buttonLabel(ButtonBase b)
+    {
+        try
+        {
+            Field text = ButtonBase.class.getDeclaredField("displayString");
+            text.setAccessible(true);
+            return String.valueOf(text.get(b));
+        }
+        catch (ReflectiveOperationException e)
+        {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * @return the centre of the Ignore button in the row of the item, GUI coordinates
+     */
+    @SuppressWarnings("unchecked")
+    private static int[] findIgnoreButton(GuiBase gui, String itemName)
+    {
+        try
+        {
+            Method getWidget = fi.dy.masa.malilib.gui.GuiListBase.class.getDeclaredMethod("getListWidget");
+            getWidget.setAccessible(true);
+            Object listWidget = getWidget.invoke(gui);
+            Field lw = fi.dy.masa.malilib.gui.widgets.WidgetListBase.class.getDeclaredField("listWidgets");
+            lw.setAccessible(true);
+            Field entryF = fi.dy.masa.litematica.gui.widgets.WidgetMaterialListEntry.class.getDeclaredField("entry");
+            entryF.setAccessible(true);
+            Field sub = fi.dy.masa.malilib.gui.widgets.WidgetContainer.class.getDeclaredField("subWidgets");
+            sub.setAccessible(true);
+            Class<?> typeClass = Class.forName("fi.dy.masa.litematica.gui.widgets.WidgetMaterialListEntry$ButtonListener$ButtonType");
+            String ignoreLabel = (String) typeClass.getMethod("getDisplayName").invoke(typeClass.getField("IGNORE").get(null));
+
+            for (var w : (List<fi.dy.masa.litematica.gui.widgets.WidgetMaterialListEntry>) lw.get(listWidget))
+            {
+                MaterialListEntry e = (MaterialListEntry) entryF.get(w);
+
+                if (e == null)
+                {
+                    continue;
+                }
+
+                String id = BuiltInRegistries.ITEM.getKey(e.getStack().getItem()).getPath();
+                log("IGN row %s at y=%d", id, w.getY());
+
+                if (id.equals(itemName))
+                {
+                    for (var child : (List<fi.dy.masa.malilib.gui.widgets.WidgetBase>) sub.get(w))
+                    {
+                        if (child instanceof ButtonBase b && ignoreLabel.equals(buttonLabel(b)))
+                        {
+                            return new int[] { b.getX() + b.getWidth() / 2, b.getY() + b.getHeight() / 2 };
+                        }
+                    }
+                }
+            }
+        }
+        catch (ReflectiveOperationException e)
+        {
+            throw new RuntimeException(e);
+        }
+
+        throw new AssertionError("Ignore button of " + itemName + " not found");
+    }
+
+    private static void realClickButton(ClientGameTestContext ctx, String label)
+    {
+        int[] pos = ctx.computeOnClient(mc -> {
+            for (ButtonBase b : screenButtons((GuiBase) mc.gui.screen()))
+            {
+                if (label.equals(buttonLabel(b)))
+                {
+                    return new int[] { b.getX() + b.getWidth() / 2, b.getY() + b.getHeight() / 2 };
+                }
+            }
+
+            StringBuilder sb = new StringBuilder();
+            screenButtons((GuiBase) mc.gui.screen()).forEach(b -> sb.append('[').append(buttonLabel(b)).append("] "));
+            throw new AssertionError("Button '" + label + "' not found among " + sb);
+        });
+        log("IGN real click on '%s' at gui %d,%d", label, pos[0], pos[1]);
+        realClickAt(ctx, pos[0], pos[1]);
+    }
+
+    private static void realClickAt(ClientGameTestContext ctx, int gx, int gy)
+    {
+        double scale = ctx.computeOnClient(mc -> mc.getWindow().getGuiScale());
+        ctx.getInput().setCursorPos((gx + 0.5) * scale, (gy + 0.5) * scale);
+        ctx.waitTicks(3);
+        ctx.getInput().pressMouse(InputConstants.MOUSE_BUTTON_LEFT);
+        ctx.waitTicks(2);
     }
 
     private static String describePlan()

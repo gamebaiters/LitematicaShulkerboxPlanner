@@ -30,6 +30,10 @@ public class InitHandler implements IInitializationHandler
 
         TickHandler.getInstance().registerClientTickHandler(PlannerSession.INSTANCE);
 
+        // Respecting Litematica's ignored entries changes what has to be packed: follow it at once,
+        // whether it's changed in the planner's settings, in the config screen or in the file
+        Configs.Generic.RESPECT_LITEMATICA_IGNORED.setValueChangeCallback(config -> PlannerSession.INSTANCE.onPackingOptionsChanged());
+
         WorldLoadListener listener = new WorldLoadListener();
         WorldLoadHandler.getInstance().registerWorldLoadPreHandler(listener);
         WorldLoadHandler.getInstance().registerWorldLoadPostHandler(listener);
