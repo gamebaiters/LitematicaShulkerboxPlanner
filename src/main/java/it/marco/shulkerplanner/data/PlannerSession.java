@@ -22,7 +22,7 @@ import fi.dy.masa.litematica.materials.MaterialListSchematic;
 import fi.dy.masa.litematica.schematic.LitematicaSchematic;
 import fi.dy.masa.litematica.schematic.placement.SchematicPlacement;
 import fi.dy.masa.malilib.interfaces.IClientTickHandler;
-import fi.dy.masa.malilib.interfaces.ICompletionListener;
+import fi.dy.masa.malilib.gui.Message.MessageType;
 import fi.dy.masa.malilib.util.InfoUtils;
 
 import it.marco.shulkerplanner.config.Configs;
@@ -69,7 +69,8 @@ public class PlannerSession implements IClientTickHandler
     /** The bound box whose shulker box screen is open right now, -1 if none */
     private int openBoxId = -1;
     private boolean waitingForMaterialList;
-    private boolean autoUpdatePlanOnRefresh;
+    /** When the refresh of the material list was asked, to stop waiting if Litematica's task never finishes */
+    private long waitingSince;
     private int tickCounter;
     @Nullable private Object lastSelectedPlacement;
     @Nullable private String unplannedSelection;
@@ -94,6 +95,12 @@ public class PlannerSession implements IClientTickHandler
 
     public boolean isWaitingForMaterialList()
     {
+        if (this.waitingForMaterialList && this.waitingSince > 0 && System.currentTimeMillis() - this.waitingSince > 60_000L)
+        {
+            // Litematica's counting task was aborted (placement removed, world left...)
+            this.waitingForMaterialList = false;
+        }
+
         return this.waitingForMaterialList;
     }
 
@@ -122,6 +129,7 @@ public class PlannerSession implements IClientTickHandler
 
         // An empty list is most likely a placement list whose counting task hasn't finished yet
         this.waitingForMaterialList = list.getMaterialsAll().isEmpty();
+        this.waitingSince = this.waitingForMaterialList ? System.currentTimeMillis() : 0;
 
         if (this.waitingForMaterialList == false)
         {
@@ -201,19 +209,13 @@ public class PlannerSession implements IClientTickHandler
 
     private void linkMaterialList(MaterialListBase list)
     {
+        // Changes of the list reach the planner through MixinMaterialListBase, see onLitematicaListChanged()
         this.materialList = list;
-
-        ICompletionListener old = ((IMixinMaterialListBase) list).shulkerplanner_getCompletionListener();
-
-        if ((old instanceof ChainedListener) == false)
-        {
-            list.setCompletionListener(new ChainedListener(list, old));
-        }
     }
 
     /**
-     * Re-creates the linked Litematica material list. For placements that runs as a task,
-     * and the result gets imported once the task finishes.
+     * Re-creates the linked Litematica material list. For placements that runs as a task ("scheduled task added"):
+     * the new counts reach {@link #onLitematicaListChanged} when it finishes, schematic lists right away.
      */
     public boolean requestMaterialListRefresh()
     {
@@ -222,42 +224,94 @@ public class PlannerSession implements IClientTickHandler
             return false;
         }
 
-        List<MaterialListEntry> before = new ArrayList<>(this.materialList.getMaterialsAll());
         this.waitingForMaterialList = true;
-        this.autoUpdatePlanOnRefresh = true;
+        this.waitingSince = System.currentTimeMillis();
         this.materialList.reCreateMaterialList();
-
-        // Schematic based lists are re-created immediately, placement based lists run a task
-        if (this.waitingForMaterialList &&
-            ((this.materialList instanceof MaterialListPlacement) == false ||
-             this.materialList.getMaterialsAll().equals(before) == false))
-        {
-            this.onMaterialListCompleted(this.materialList);
-        }
-
         return true;
     }
 
-    private void onMaterialListCompleted(MaterialListBase list)
+    /**
+     * Called by MixinMaterialListBase after a Litematica material list got new counts (its refresh button,
+     * the planner's refresh button, the counting task of a placement) or after an entry was ignored or the
+     * ignored entries were cleared. If it's the list of the open project, the materials are imported again
+     * and the shulker boxes follow at once: a draft plan is packed again, a locked plan is updated keeping
+     * the boxes already done and the started boxes (these only lose what isn't needed at all anymore).
+     *
+     * @param newCounts true for new counts, false for a change of the ignored entries
+     */
+    public void onLitematicaListChanged(MaterialListBase list, boolean newCounts)
     {
-        if (list == this.materialList && this.project != null)
-        {
-            boolean autoUpdate = this.autoUpdatePlanOnRefresh;
-            this.autoUpdatePlanOnRefresh = false;
-            this.waitingForMaterialList = false;
-            this.importMaterials();
-            this.refreshInventory(false);
+        PlannerProject p = this.project;
 
-            if (autoUpdate && this.project.isLocked())
+        if (p == null)
+        {
+            return;
+        }
+
+        if (list != this.materialList)
+        {
+            // Another instance of the same list (a placement's list made again, a list opened from Litematica's menu)
+            if (p.getName().equals(list.getName()) == false)
             {
-                this.updateLockedPlan();
+                return;
             }
-            else
+
+            this.materialList = list;
+        }
+
+        if (newCounts)
+        {
+            this.waitingForMaterialList = false;
+            this.waitingSince = 0;
+        }
+
+        if (list.getMaterialsAll().isEmpty())
+        {
+            // Nothing counted (task aborted, empty area): keep what we have rather than emptying the plan
+            return;
+        }
+
+        Map<String, Long> before = new LinkedHashMap<>(this.getRequiredCounts());
+        this.importMaterials();
+        this.invalidate();
+        this.refreshInventory(false);
+        Map<String, Long> after = this.getRequiredCounts();
+        int changed = countChanges(before, after);
+
+        if (p.isLocked() && this.isPlanOutdated())
+        {
+            this.updateLockedPlan();
+        }
+        else
+        {
+            this.notifyUpdate();
+        }
+
+        if (changed > 0)
+        {
+            InfoUtils.showGuiOrInGameMessage(MessageType.SUCCESS, 4000, "shulkerplanner.message.plan_follows_list", changed);
+        }
+        else if (newCounts)
+        {
+            InfoUtils.showGuiOrInGameMessage(MessageType.INFO, 3000, "shulkerplanner.message.list_no_changes");
+        }
+    }
+
+    private static int countChanges(Map<String, Long> before, Map<String, Long> after)
+    {
+        Set<String> ids = new HashSet<>(before.keySet());
+        ids.addAll(after.keySet());
+        int changed = 0;
+
+        for (String id : ids)
+        {
+            if (before.getOrDefault(id, 0L).equals(after.getOrDefault(id, 0L)) == false)
             {
-                this.invalidate();
-                this.notifyUpdate();
+                ++changed;
             }
         }
+
+        return changed;
     }
 
     private void importMaterials()
@@ -1205,43 +1259,6 @@ public class PlannerSession implements IClientTickHandler
             {
                 this.project = ProjectStorage.load(last);
             }
-        }
-    }
-
-    /**
-     * Forwards the completion event to the original listener (usually the Litematica material list GUI)
-     */
-    private class ChainedListener implements ICompletionListener
-    {
-        private final MaterialListBase list;
-        @Nullable private final ICompletionListener original;
-
-        private ChainedListener(MaterialListBase list, @Nullable ICompletionListener original)
-        {
-            this.list = list;
-            this.original = original;
-        }
-
-        @Override
-        public void onTaskCompleted()
-        {
-            if (this.original != null)
-            {
-                this.original.onTaskCompleted();
-            }
-
-            PlannerSession.this.onMaterialListCompleted(this.list);
-        }
-
-        @Override
-        public void onTaskAborted()
-        {
-            if (this.original != null)
-            {
-                this.original.onTaskAborted();
-            }
-
-            PlannerSession.this.waitingForMaterialList = false;
         }
     }
 }

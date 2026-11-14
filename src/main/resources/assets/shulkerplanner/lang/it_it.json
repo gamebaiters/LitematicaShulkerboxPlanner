@@ -345,6 +345,8 @@
     "shulkerplanner.message.plan_locked": "Piano bloccato: ora puoi collegare le tue shulker box",
     "shulkerplanner.message.plan_reset": "Piano sbloccato e azzerato",
     "shulkerplanner.message.plan_updated": "Piano aggiornato alle nuove quantità",
+    "shulkerplanner.message.plan_follows_list": "Lista shulker aggiornata dalla lista materiali (%s item cambiati)",
+    "shulkerplanner.message.list_no_changes": "Lista materiali aggiornata: le shulker non cambiano",
     "shulkerplanner.hotkeys.category.generic": "Hotkey",
     "shulkerplanner.config.generic.name.hudEnabled": "hudEnabled",
     "shulkerplanner.config.generic.prettyName.hudEnabled": "HUD",

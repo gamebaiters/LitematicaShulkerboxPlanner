@@ -388,12 +388,16 @@ t("assistant.hover.resize", "Trascina per ridimensionare", "Drag to resize")
 t("assistant.hover.in_box", "Nella shulker: %s / %s (%s)", "In the box: %s / %s (%s)")
 t("assistant.hover.wrong", "Non fa parte di questa fase: %s da togliere", "Not part of this box: %s to remove")
 t("assistant.already_linked", "Questa fase ha già un'altra shulker", "Phase already linked to another box")
+t("assistant.all_linked", "Tutte le fasi sono già collegate ad altre shulker", "All phases are linked to other boxes")
+t("assistant.hover.jei", "Click / R: ricette JEI  ·  Click dx / U: usi", "Click / R: JEI recipes  ·  Right-click / U: uses")
 
 t("message.box_complete", "Shulker #%s completata!", "Shulker box #%s complete!")
 t("message.hold_shift_to_unlink", "Tieni premuto Shift per scollegare la shulker", "Hold Shift to unlink the shulker box")
 t("message.plan_locked", "Piano bloccato: ora puoi collegare le tue shulker box", "Plan locked: you can now link your shulker boxes")
 t("message.plan_reset", "Piano sbloccato e azzerato", "Plan unlocked and reset")
 t("message.plan_updated", "Piano aggiornato alle nuove quantità", "Plan updated to the new material counts")
+t("message.plan_follows_list", "Lista shulker aggiornata dalla lista materiali (%s item cambiati)", "Shulker boxes updated from the material list (%s items changed)")
+t("message.list_no_changes", "Lista materiali aggiornata: le shulker non cambiano", "Material list refreshed: the shulker boxes stay the same")
 
 # Config
 t("hotkeys.category.generic", "Hotkey", "Hotkeys")

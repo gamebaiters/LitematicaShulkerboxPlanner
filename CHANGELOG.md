@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.1.4 - Minecraft 26.3
+
+**The shulker boxes follow the material list, every time**
+- Ignoring an item in Litematica's material list, clearing the ignored items, or refreshing the list (Litematica's *Refresh* button, the planner's *Refresh materials* button, the "scheduled task" of a placement list) now updates the shulker boxes right away, with a message telling how many items changed. Before, as soon as Litematica's material list screen had been opened, the planner stopped hearing about the refresh (the screen takes the list's completion listener) and ignoring an item was never noticed: "scheduled task added", then nothing changed.
+- A locked plan is updated at once: boxes marked done stay exactly as they are; boxes being filled (or linked) lose the items that aren't needed at all anymore (removed or ignored) and take in the new ones in their free slots; if less of an item is needed but it's still needed (count mode *Missing* while building), what's already packed stays. A started box left with nothing in it is dropped.
+
+## 2.1.3 - Minecraft 26.3
+
+- Boxes being filled take in the items added to the material list (partial stacks and free slots) before new boxes are made.
+
+## 2.1.2 - Minecraft 26.3
+
+- The panel next to a shulker box no longer shows the state of a box linked to another shulker box.
+- The HUD outside containers stays on the last linked box opened.
+- Optional JEI integration: click an item of the panel for its recipes (right click: uses), R / U and bookmarks work on it.
+
 ## 2.1.1 - Minecraft 26.3
 
 **Fixes**

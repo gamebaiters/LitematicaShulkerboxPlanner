@@ -82,6 +82,60 @@ class PlanRebaserTest
     }
 
     @Test
+    void ignoredItemLeavesTheStartedBoxesButNotTheDoneOnes()
+    {
+        // #1 done (stone + glass), #2 being filled (glass + torch + lantern)
+        PlannedBox done = new PlannedBox(List.of(new PlannedStack(req("stone", 64, 1), 64), new PlannedStack(req("glass", 64, 2), 64)));
+        done.setId(1);
+        done.setIndex(1);
+        PlannedBox filling = new PlannedBox(List.of(new PlannedStack(req("glass", 64, 2), 64), new PlannedStack(req("glass", 64, 2), 36),
+                                                    new PlannedStack(req("torch", 64, 3), 64), new PlannedStack(req("lantern", 64, 4), 20)));
+        filling.setId(2);
+        filling.setIndex(2);
+
+        // Glass ignored in Litematica: it's not needed anymore
+        List<ItemRequirement> now = List.of(req("stone", 64, 1), req("torch", 64, 3), req("lantern", 20, 4));
+        List<PlannedBox> rebased = PlanRebaser.rebase(List.of(done), List.of(filling), now, PackMode.SMART, false, false, 100);
+
+        assertEquals(2, rebased.size(), "no new box: " + rebased);
+        assertSame(done, rebased.get(0), "the done box stays exactly as it is");
+        PlannedBox box2 = rebased.get(1);
+        assertEquals(2, box2.getId());
+        assertEquals(2, box2.getIndex());
+        assertEquals(null, box2.getTotals().get("glass"), "ignored glass is taken out of the started box");
+        assertEquals(64, box2.getTotals().get("torch"));
+        assertEquals(20, box2.getTotals().get("lantern"));
+    }
+
+    @Test
+    void lessOfAnItemStillNeededKeepsWhatIsPacked()
+    {
+        // "Missing" count mode while building: fewer torches missing, but the packed ones stay in the plan
+        PlannedBox filling = new PlannedBox(List.of(new PlannedStack(req("torch", 64, 1), 64), new PlannedStack(req("torch", 64, 1), 64)));
+        filling.setId(5);
+        filling.setIndex(1);
+        List<PlannedBox> rebased = PlanRebaser.rebase(List.of(), List.of(filling), List.of(req("torch", 40, 1)), PackMode.SMART, false, false, 100);
+
+        assertEquals(1, rebased.size());
+        assertSame(filling, rebased.get(0), "nothing changed in the started box");
+    }
+
+    @Test
+    void startedBoxWithNothingLeftIsDropped()
+    {
+        PlannedBox only = new PlannedBox(List.of(new PlannedStack(req("glass", 64, 1), 64)));
+        only.setId(3);
+        only.setIndex(1);
+        PlannedBox other = new PlannedBox(List.of(new PlannedStack(req("stone", 64, 2), 64)));
+        other.setId(4);
+        other.setIndex(2);
+        List<PlannedBox> rebased = PlanRebaser.rebase(List.of(), List.of(only, other), List.of(req("stone", 64, 2)), PackMode.SMART, false, false, 100);
+
+        assertEquals(1, rebased.size(), "" + rebased);
+        assertEquals(4, rebased.get(0).getId());
+    }
+
+    @Test
     void countModeRequired()
     {
         assertEquals(100, CountMode.TOTAL.required(100, 40, 1));

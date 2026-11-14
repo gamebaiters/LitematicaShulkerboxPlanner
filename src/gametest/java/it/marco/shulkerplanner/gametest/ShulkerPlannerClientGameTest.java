@@ -1429,7 +1429,8 @@ public class ShulkerPlannerClientGameTest implements FabricClientGameTest
             check(session.isBoxDone(session.getPlan().getBoxes().get(1)), "the filled linked box should be done");
         });
 
-        // 6. The material list changes: the locked plan stays, the player decides when to update it
+        // 6. The material list changes: the shulker boxes follow it right away. The done box #2 stays as it is.
+        String box2 = ctx.computeOnClient(mc -> PlannerSession.INSTANCE.getPlan().getBoxes().get(1).getSignature());
         TestMaterialList changed = ctx.computeOnClient(mc -> new TestMaterialList("GameTest Links", List.of(
                 entry("stone_bricks", 27 * 64 + 640, 27 * 64 + 100),
                 entry("glass", 300, 300),
@@ -1442,36 +1443,80 @@ public class ShulkerPlannerClientGameTest implements FabricClientGameTest
         ctx.waitTicks(5);
         ctx.runOnClient(mc -> {
             PlannerSession session = PlannerSession.INSTANCE;
-            check(describePlan().equals(planBefore), "a locked plan must not change when the material list changes");
-            check(session.isPlanOutdated(), "the plan should be marked as outdated");
-            String box2 = session.getPlan().getBoxes().get(1).getSignature();
-            session.updateLockedPlan();
+            check(describePlan().equals(planBefore) == false, "the shulker boxes must follow the new material list");
+            check(session.isPlanOutdated() == false, "the plan follows the material list, nothing left to update");
+            check(session.getPlan().getPackedTotals().getOrDefault("minecraft:lantern", 0L) == 20, "the added lanterns are packed");
             check(session.getPlan().getBoxes().stream().anyMatch(bx -> bx.getIndex() == 2 && bx.getSignature().equals(box2)),
-                  "updating the plan must keep the started box #2 as it is");
-            check(session.isPlanOutdated() == false, "the updated plan is up to date");
-            check(session.getBinding(session.getPlan().getBoxById(2)) != null || session.getProject().getBindings().size() == 1, "the link stays");
-            log("Links: updated plan %s", describePlan());
+                  "the done box #2 must stay as it is");
+            check(session.getProject().getBindings().size() == 1, "the link stays");
+            log("Links: plan after the list changed %s", describePlan());
+        });
 
-            // A FILLING (not DONE) box with free slots absorbs newly added items on material list refresh
-            PlannedBox box3 = session.getPlan().getBoxes().stream()
-                    .filter(bx -> session.isBoxDone(bx) == false && bx.getFreeSlots() > 0)
+        // 6b. Marco's case: Litematica's material list screen is open (it takes the list's completion listener),
+        // an item is ignored there, then the list is refreshed. Every step must reach the shulker boxes.
+        int fillingId = ctx.computeOnClient(mc -> {
+            PlannerSession session = PlannerSession.INSTANCE;
+            PlannedBox filling = session.getPlan().getBoxes().stream()
+                    .filter(bx -> session.isBoxDone(bx) == false && bx.getTotals().containsKey("minecraft:lantern"))
                     .findFirst().orElse(null);
-            check(box3 != null, "expected an unfinished box with free slots");
-            int box3Id = box3.getId();
-            session.setBoxState(box3, BoxState.FILLING);
+            check(filling != null, "expected an unfinished box with the lanterns");
+            session.setBoxState(filling, BoxState.FILLING);
+            GuiBase.openGui(new GuiMaterialList(changed));
+            return filling.getId();
+        });
+        ctx.waitTicks(3);
+        ctx.runOnClient(mc -> {
+            PlannerSession session = PlannerSession.INSTANCE;
+            MaterialListEntry lantern = changed.getMaterialsAll().stream()
+                    .filter(e -> e.getStack().is(BuiltInRegistries.ITEM.getValue(Identifier.parse("minecraft:lantern")))).findFirst().orElseThrow();
+            changed.ignoreEntry(lantern);
+            check(session.getPlan().getPackedTotals().containsKey("minecraft:lantern") == false,
+                  "an item ignored in Litematica's material list must leave the shulker boxes, got " + describePlan());
+            PlannedBox filling = session.getPlan().getBoxById(fillingId);
+            check(filling != null && filling.getTotals().containsKey("minecraft:lantern") == false,
+                  "the ignored lanterns must leave the box being filled #" + fillingId);
+            check(session.getPlan().getBoxes().stream().anyMatch(bx -> bx.getIndex() == 2 && bx.getSignature().equals(box2)),
+                  "the done box #2 must stay as it is after ignoring an item");
+            log("Links: lanterns ignored %s", describePlan());
+
+            // Refresh with Litematica's button (placement lists: "scheduled task added", then new counts)
             changed.replaceEntries(List.of(
                     entry("stone_bricks", 27 * 64 + 640, 27 * 64 + 100),
                     entry("glass", 300, 300),
                     entry("oak_stairs", 100, 100),
                     entry("lantern", 20, 20),
                     entry("torch", 64, 64)));
-            check(session.requestMaterialListRefresh(), "material list refresh should succeed");
-            check(session.isPlanOutdated() == false, "refreshing materials updates the locked plan");
-            PlannedBox updatedBox3 = session.getPlan().getBoxById(box3Id);
-            check(updatedBox3 != null && updatedBox3.getTotals().getOrDefault("minecraft:torch", 0) == 64,
-                  "filling box #" + box3Id + " should include newly added torches, got " + (updatedBox3 != null ? updatedBox3.getTotals() : "null"));
+            changed.reCreateMaterialList();
+            check(session.getPlan().getPackedTotals().getOrDefault("minecraft:torch", 0L) == 64,
+                  "the torches added by the refresh must be packed, got " + describePlan());
+            check(session.getPlan().getPackedTotals().containsKey("minecraft:lantern") == false,
+                  "the lanterns stay ignored after the refresh");
+            PlannedBox afterRefresh = session.getPlan().getBoxById(fillingId);
+            check(afterRefresh != null && afterRefresh.getTotals().getOrDefault("minecraft:torch", 0) == 64,
+                  "the box being filled #" + fillingId + " should take the new torches, got " + (afterRefresh != null ? afterRefresh.getTotals() : "null"));
+            check(session.isPlanOutdated() == false, "nothing left to update after the refresh");
+
+            // The planner's own refresh button, still with Litematica's screen holding the listener
+            changed.replaceEntries(List.of(
+                    entry("stone_bricks", 27 * 64 + 640, 27 * 64 + 100),
+                    entry("glass", 300, 300),
+                    entry("oak_stairs", 100, 100),
+                    entry("lantern", 20, 20),
+                    entry("torch", 64, 64),
+                    entry("ladder", 30, 30)));
+            check(session.requestMaterialListRefresh(), "material list refresh should start");
+            check(session.isWaitingForMaterialList() == false, "the refresh finished");
+            check(session.getPlan().getPackedTotals().getOrDefault("minecraft:ladder", 0L) == 30,
+                  "the planner's refresh button must update the shulker boxes, got " + describePlan());
+
+            // Clearing the ignored entries brings the lanterns back
+            changed.clearIgnored();
+            check(session.getPlan().getPackedTotals().getOrDefault("minecraft:lantern", 0L) == 20,
+                  "clearing the ignored entries must bring the lanterns back, got " + describePlan());
             check(session.getPlan().getBoxes().stream().anyMatch(bx -> bx.getIndex() == 2 && bx.getSignature().equals(box2)),
-                  "DONE box #2 must stay unchanged after adding items");
+                  "the done box #2 must stay as it is");
+            log("Links: after refresh and clear ignored %s", describePlan());
+            GuiBase.openGui(null);
         });
 
         // 7. Raw materials: stone bricks become cobblestone (stone from the furnace)

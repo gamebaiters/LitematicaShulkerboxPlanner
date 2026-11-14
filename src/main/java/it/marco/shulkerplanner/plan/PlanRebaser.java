@@ -30,8 +30,12 @@ public class PlanRebaser
      * Updates a locked plan:
      * <ul>
      *   <li>{@code frozen} boxes (e.g. DONE) stay completely unchanged (same instance, contents, id and number).</li>
-     *   <li>{@code expandable} boxes (e.g. FILLING or linked TODO) keep their existing stacks, id and number,
-     *       and use any partial stacks / free slots to absorb newly added requirements before creating new boxes.</li>
+     *   <li>{@code expandable} boxes (e.g. FILLING or linked TODO) keep their id and number and the stacks of
+     *       every item that is still needed (even if less of it is needed now: in "missing" count mode the counts
+     *       go down while building, and what's packed must not disappear from the plan). Items that aren't needed
+     *       at all anymore (removed from the list, ignored in Litematica) are taken out. Then their partial
+     *       stacks and free slots absorb newly added requirements before new boxes are made.
+     *       A started box left with nothing in it is dropped.</li>
      * </ul>
      */
     public static List<PlannedBox> rebase(List<PlannedBox> frozen, List<PlannedBox> expandable,
@@ -56,6 +60,36 @@ public class PlanRebaser
             normalized.add(req);
         }
 
+        Set<String> needed = new java.util.HashSet<>();
+        normalized.forEach(req -> needed.add(req.id()));
+
+        // Started boxes without the items that aren't needed anymore
+        List<PlannedBox> trimmed = new ArrayList<>(expandable.size());
+
+        for (PlannedBox box : expandable)
+        {
+            List<PlannedStack> kept = new ArrayList<>();
+
+            for (PlannedStack stack : box.getSlots())
+            {
+                if (needed.contains(stack.id()))
+                {
+                    kept.add(stack);
+                }
+            }
+
+            PlannedBox b = box;
+
+            if (kept.size() != box.getSlots().size())
+            {
+                b = new PlannedBox(kept);
+                b.setId(box.getId());
+                b.setIndex(box.getIndex());
+            }
+
+            trimmed.add(b);
+        }
+
         Map<String, Long> covered = new HashMap<>();
 
         for (PlannedBox box : frozen)
@@ -63,7 +97,7 @@ public class PlanRebaser
             box.getTotals().forEach((id, count) -> covered.merge(id, (long) count, Long::sum));
         }
 
-        for (PlannedBox box : expandable)
+        for (PlannedBox box : trimmed)
         {
             box.getTotals().forEach((id, count) -> covered.merge(id, (long) count, Long::sum));
         }
@@ -89,8 +123,9 @@ public class PlanRebaser
             result.add(box);
         }
 
-        for (PlannedBox box : expandable)
+        for (int b = 0; b < trimmed.size(); ++b)
         {
+            PlannedBox box = trimmed.get(b);
             List<PlannedStack> slots = new ArrayList<>(box.getSlots());
             boolean changed = false;
 
@@ -128,13 +163,19 @@ public class PlanRebaser
                 }
             }
 
-            PlannedBox updated = box;
+            PlannedBox updated = box;   // the same instance as before when nothing changed
 
             if (changed)
             {
                 updated = new PlannedBox(slots);
                 updated.setId(box.getId());
                 updated.setIndex(box.getIndex());
+            }
+
+            if (updated.getSlots().isEmpty())
+            {
+                // Everything it had isn't needed anymore, and nothing new fits in it: no box
+                continue;
             }
 
             usedNumbers.add(updated.getIndex());

@@ -345,6 +345,8 @@
     "shulkerplanner.message.plan_locked": "Plan locked: you can now link your shulker boxes",
     "shulkerplanner.message.plan_reset": "Plan unlocked and reset",
     "shulkerplanner.message.plan_updated": "Plan updated to the new material counts",
+    "shulkerplanner.message.plan_follows_list": "Shulker boxes updated from the material list (%s items changed)",
+    "shulkerplanner.message.list_no_changes": "Material list refreshed: the shulker boxes stay the same",
     "shulkerplanner.hotkeys.category.generic": "Hotkeys",
     "shulkerplanner.config.generic.name.hudEnabled": "hudEnabled",
     "shulkerplanner.config.generic.prettyName.hudEnabled": "HUD",
