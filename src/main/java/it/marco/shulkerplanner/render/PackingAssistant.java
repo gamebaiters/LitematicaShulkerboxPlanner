@@ -10,12 +10,15 @@ import javax.annotation.Nullable;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.client.resources.sounds.SimpleSoundInstance;
+import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ShulkerBoxMenu;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 
+import fi.dy.masa.malilib.gui.GuiBase;
 import fi.dy.masa.malilib.render.GuiContext;
 import fi.dy.masa.malilib.util.StringUtils;
 
@@ -25,6 +28,7 @@ import it.marco.shulkerplanner.data.PlannerProject;
 import it.marco.shulkerplanner.data.PlannerSession;
 import it.marco.shulkerplanner.data.ShulkerBinding;
 import it.marco.shulkerplanner.data.ShulkerTracker;
+import it.marco.shulkerplanner.gui.ui.LayoutProbe;
 import it.marco.shulkerplanner.gui.ui.Theme;
 import it.marco.shulkerplanner.gui.ui.Ui;
 import it.marco.shulkerplanner.plan.BoxState;
@@ -40,13 +44,25 @@ import it.marco.shulkerplanner.util.InventoryScanner;
  * A shulker box is only tied to a box of the plan when the player links it: an unlinked shulker box shows
  * a preview of the suggested box and a "Link" button, and nothing changes until it's pressed.
  * A linked shulker box stays linked when it's picked up and placed again, see {@link ShulkerTracker}.
+ * <p>
+ * The panel is anchored to the container screen: by default it's next to it, top aligned and as tall as it.
+ * It can be dragged by its title bar and resized from the bottom right corner, the position is saved
+ * relative to the container screen. The list of items scrolls with the mouse wheel or the scroll bar.
  */
 public class PackingAssistant
 {
-    private static final int PANEL_WIDTH = 176;
-    private static final int PANEL_MIN_WIDTH = 132;
-    private static final int LINE_HEIGHT = 18;
-    private static final int MAX_ITEM_LINES = 8;
+    private static final int DEFAULT_WIDTH = 176;
+    private static final int MIN_WIDTH = 120;
+    private static final int MIN_HEIGHT = 96;
+    private static final int PAD = 6;
+    private static final int TITLE_HEIGHT = 20;
+    private static final int ROW_HEIGHT = 20;
+    private static final int HEADER_ROW_HEIGHT = 12;
+    private static final int BUTTON_HEIGHT = 16;
+    private static final int SCROLLBAR_WIDTH = 5;
+    private static final int GRIP = 9;
+    private static final int SIDE_RIGHT = 1;
+    private static final int SIDE_LEFT = 2;
 
     @Nullable private static Object lastScreen;
     @Nullable private static ShulkerTracker.Opened opened;
@@ -58,6 +74,44 @@ public class PackingAssistant
     @Nullable private static String initialSignature;
     @Nullable private static String lastSavedSignature;
     private static final List<Button> buttons = new ArrayList<>();
+    private static final List<Row> rows = new ArrayList<>();
+
+    // The panel as drawn in the last frame, in screen coordinates
+    private static int panelX;
+    private static int panelY;
+    private static int panelW;
+    private static int panelH;
+    private static boolean panelVisible;
+    // The scrolled list inside the panel
+    private static int listX;
+    private static int listY;
+    private static int listW;
+    private static int listH;
+    private static int scroll;
+    private static int contentHeight;
+    private static int shownBoxId = -1;
+    // The container screen the panel is anchored to
+    private static int anchorLeft;
+    private static int anchorTop;
+    private static int anchorWidth;
+
+    private enum Drag
+    {
+        NONE,
+        MOVE,
+        RESIZE,
+        SCROLLBAR
+    }
+
+    private static Drag drag = Drag.NONE;
+    private static boolean pressedInPanel;
+    private static double dragStartX;
+    private static double dragStartY;
+    private static int dragStartPanelX;
+    private static int dragStartPanelY;
+    private static int dragStartW;
+    private static int dragStartH;
+    private static int dragStartScroll;
 
     private record Button(int x, int y, int w, int h, Runnable action)
     {
@@ -65,6 +119,13 @@ public class PackingAssistant
         {
             return Ui.inside(mx, my, this.x, this.y, this.w, this.h);
         }
+    }
+
+    /**
+     * One line of the scrolled list
+     */
+    private record Row(int height, @Nullable String id, int want, int have, boolean wrong, boolean header)
+    {
     }
 
     private static boolean isActive(AbstractContainerScreen<?> screen)
@@ -103,6 +164,11 @@ public class PackingAssistant
         previewId = -1;
         initialSignature = null;
         lastSavedSignature = null;
+        panelVisible = false;
+        scroll = 0;
+        shownBoxId = -1;
+        drag = Drag.NONE;
+        pressedInPanel = false;
         PlannerSession.INSTANCE.setOpenBox(-1);
     }
 
@@ -113,6 +179,11 @@ public class PackingAssistant
     {
         if (lastScreen != null)
         {
+            if (drag == Drag.MOVE || drag == Drag.RESIZE)
+            {
+                Configs.saveToFile();
+            }
+
             PlannerSession.INSTANCE.save();
             reset(null);
         }
@@ -178,6 +249,7 @@ public class PackingAssistant
 
         if (isActive(screen) == false)
         {
+            panelVisible = false;
             return;
         }
 
@@ -269,7 +341,16 @@ public class PackingAssistant
             renderSlotHighlights(menu, ctx, leftPos, topPos, contents, planned);
         }
 
-        drawPanel(screen, ctx, mouseX, mouseY, leftPos, topPos, imageWidth, plan, target, linked, state, contents, complete);
+        if (target.getId() != shownBoxId)
+        {
+            shownBoxId = target.getId();
+            scroll = 0;
+        }
+
+        anchorLeft = leftPos;
+        anchorTop = topPos;
+        anchorWidth = imageWidth;
+        drawPanel(screen, ctx, mouseX, mouseY, imageHeight, plan, target, linked, state, contents, complete);
     }
 
     /**
@@ -304,11 +385,88 @@ public class PackingAssistant
         lastSavedSignature = PlannedBox.createSignature(contents);
     }
 
-    private static void drawPanel(AbstractContainerScreen<?> screen, GuiContext ctx, int mouseX, int mouseY, int leftPos, int topPos, int imageWidth,
+    // ---------------------------------------------------------------- geometry
+
+    /**
+     * Puts the panel back next to the container screen, with the automatic size
+     */
+    public static void resetGeometry()
+    {
+        Configs.Generic.ASSISTANT_SIDE.setIntegerValue(0);
+        Configs.Generic.ASSISTANT_GAP.setIntegerValue(4);
+        Configs.Generic.ASSISTANT_OFFSET_Y.setIntegerValue(0);
+        Configs.Generic.ASSISTANT_WIDTH.setIntegerValue(0);
+        Configs.Generic.ASSISTANT_HEIGHT.setIntegerValue(0);
+        Configs.saveToFile();
+    }
+
+    /**
+     * @return the panel as drawn in the last frame: x, y, width, height. Width 0 if it's not shown.
+     */
+    public static int[] getPanelBounds()
+    {
+        return panelVisible ? new int[] { panelX, panelY, panelW, panelH } : new int[] { 0, 0, 0, 0 };
+    }
+
+    /**
+     * @return the scroll position of the list and the maximum scroll position
+     */
+    public static int[] getScroll()
+    {
+        return new int[] { scroll, getMaxScroll() };
+    }
+
+    private static int getMaxScroll()
+    {
+        return Math.max(0, contentHeight - listH);
+    }
+
+    public static boolean isMouseOverPanel(double mouseX, double mouseY)
+    {
+        return panelVisible && Ui.inside(mouseX, mouseY, panelX, panelY, panelW, panelH);
+    }
+
+    /**
+     * Saves where the panel is, relative to the container screen it's anchored to
+     */
+    private static void storeAnchor(int x, int y, int w)
+    {
+        int containerRight = anchorLeft + anchorWidth;
+        boolean right = x + w / 2 >= anchorLeft + anchorWidth / 2;
+        Configs.Generic.ASSISTANT_SIDE.setIntegerValue(right ? SIDE_RIGHT : SIDE_LEFT);
+        Configs.Generic.ASSISTANT_GAP.setIntegerValue(right ? x - containerRight : anchorLeft - (x + w));
+        Configs.Generic.ASSISTANT_OFFSET_Y.setIntegerValue(y - anchorTop);
+    }
+
+    // ---------------------------------------------------------------- drawing
+
+    private static int stackLines(List<String> labels, int width)
+    {
+        int lines = 1;
+        int x = 0;
+
+        for (String label : labels)
+        {
+            int w = Ui.width(label) + 10;
+
+            if (x > 0 && x + w > width)
+            {
+                ++lines;
+                x = 0;
+            }
+
+            x += w + 3;
+        }
+
+        return lines;
+    }
+
+    private static void drawPanel(AbstractContainerScreen<?> screen, GuiContext ctx, int mouseX, int mouseY, int imageHeight,
                                   ShulkerPlan plan, PlannedBox target, boolean linked, BoxState state,
                                   Map<String, Integer> contents, boolean complete)
     {
         PlannerSession session = PlannerSession.INSTANCE;
+        PlannerProject project = session.getProject();
         Map<String, Integer> planned = target.getTotals();
         List<String> wrong = new ArrayList<>();
 
@@ -320,37 +478,161 @@ public class PackingAssistant
             }
         }
 
-        boolean showWrong = Configs.Warnings.PANEL_WRONG_ITEMS.getBooleanValue() && (linked || wrong.isEmpty() == false);
-        int itemLines = Math.min(planned.size(), MAX_ITEM_LINES);
-        int wrongLines = showWrong ? Math.min(wrong.size(), 3) : 0;
+        boolean showWrong = Configs.Warnings.PANEL_WRONG_ITEMS.getBooleanValue() && wrong.isEmpty() == false;
         boolean hint = linked == false && Configs.Warnings.HINT_UNLINKED_BOX.getBooleanValue();
 
-        int height = 8 + 18 + 10 + 6 + itemLines * LINE_HEIGHT + (planned.size() > itemLines ? 10 : 0)
-                     + (wrongLines > 0 ? 12 + wrongLines * LINE_HEIGHT : 0) + 14 + (hint ? 22 : 0) + 22 + 6;
+        // The rows of the scrolled list
+        rows.clear();
 
-        int spaceRight = screen.width - (leftPos + imageWidth) - 8;
-        int spaceLeft = leftPos - 8;
-        boolean right = spaceRight >= PANEL_WIDTH || spaceRight >= spaceLeft;
-        int width = Math.max(PANEL_MIN_WIDTH, Math.min(PANEL_WIDTH, right ? spaceRight : spaceLeft));
-        int x = right ? leftPos + imageWidth + 4 : leftPos - width - 4;
-        x = Math.max(2, Math.min(x, screen.width - width - 2));
-        int y = Math.max(2, Math.min(topPos, screen.height - height - 2));
+        for (Map.Entry<String, Integer> e : planned.entrySet())
+        {
+            rows.add(new Row(ROW_HEIGHT, e.getKey(), e.getValue(), contents.getOrDefault(e.getKey(), 0), false, false));
+        }
 
+        if (showWrong)
+        {
+            rows.add(new Row(HEADER_ROW_HEIGHT, null, 0, 0, true, true));
+
+            for (String id : wrong)
+            {
+                rows.add(new Row(ROW_HEIGHT, id, 0, contents.get(id), true, false));
+            }
+        }
+
+        contentHeight = 0;
+
+        for (Row row : rows)
+        {
+            contentHeight += row.height();
+        }
+
+        // The action buttons, which wrap to more lines on a narrow panel
+        List<String> labels = new ArrayList<>();
+        String doneLabel = state == BoxState.DONE ? StringUtils.translate("shulkerplanner.assistant.undo_done")
+                                                  : "✔ " + StringUtils.translate("shulkerplanner.assistant.mark_done");
+        boolean followed = session.isFollowed(target);
+        String linkLabel = "+ " + StringUtils.translate("shulkerplanner.assistant.link", target.getIndex());
+        boolean canLink = session.getBinding(target) == null;
+
+        if (linked)
+        {
+            labels.add("✕ " + StringUtils.translate("shulkerplanner.assistant.unlink"));
+            labels.add(doneLabel);
+        }
+        else
+        {
+            labels.add("◀");
+            labels.add("▶");
+            labels.add(canLink ? linkLabel : StringUtils.translate("shulkerplanner.assistant.already_linked"));
+        }
+
+        // Geometry: anchored to the container screen, size and position from the config
+        int sw = screen.width;
+        int sh = screen.height;
+        int containerRight = anchorLeft + anchorWidth;
+        int side = Configs.Generic.ASSISTANT_SIDE.getIntegerValue();
+        int gap = Configs.Generic.ASSISTANT_GAP.getIntegerValue();
+
+        if (side != SIDE_RIGHT && side != SIDE_LEFT)
+        {
+            int spaceRight = sw - containerRight - 6;
+            int spaceLeft = anchorLeft - 6;
+            side = spaceRight >= MIN_WIDTH || spaceRight >= spaceLeft ? SIDE_RIGHT : SIDE_LEFT;
+            gap = 4;
+        }
+
+        int space = side == SIDE_RIGHT ? sw - containerRight - gap - 2 : anchorLeft - gap - 2;
+        int w = Configs.Generic.ASSISTANT_WIDTH.getIntegerValue();
+
+        if (w <= 0)
+        {
+            w = Math.max(MIN_WIDTH, Math.min(DEFAULT_WIDTH, space));
+        }
+
+        w = Math.max(MIN_WIDTH, Math.min(w, sw - 4));
+        int inner = w - 2 * PAD;
+        int footerLines = stackLines(labels, inner - GRIP);
+        int hintHeight = hint ? 24 : 0;
+        int fixed = TITLE_HEIGHT + 19 + 4 + 13 + hintHeight + footerLines * (BUTTON_HEIGHT + 3) + 4;
+        int h = Configs.Generic.ASSISTANT_HEIGHT.getIntegerValue();
+
+        if (h <= 0)
+        {
+            // Automatic: as tall as the container screen, shorter if there's little to show
+            h = Math.min(fixed + Math.max(contentHeight, ROW_HEIGHT), Math.max(imageHeight, MIN_HEIGHT));
+        }
+
+        h = Math.max(Math.min(MIN_HEIGHT, sh - 4), Math.min(h, sh - 4));
+        int x = side == SIDE_RIGHT ? containerRight + gap : anchorLeft - gap - w;
+        int y = anchorTop + Configs.Generic.ASSISTANT_OFFSET_Y.getIntegerValue();
+
+        if (drag == Drag.MOVE || drag == Drag.RESIZE)
+        {
+            // While dragging, the panel follows the mouse exactly
+            x = panelX;
+            y = panelY;
+
+            if (drag == Drag.RESIZE)
+            {
+                w = panelW;
+                h = panelH;
+                inner = w - 2 * PAD;
+                footerLines = stackLines(labels, inner - GRIP);
+                fixed = TITLE_HEIGHT + 19 + 4 + 13 + hintHeight + footerLines * (BUTTON_HEIGHT + 3) + 4;
+            }
+        }
+
+        x = Math.max(2, Math.min(x, sw - w - 2));
+        y = Math.max(2, Math.min(y, sh - h - 2));
+        panelX = x;
+        panelY = y;
+        panelW = w;
+        panelH = h;
+        panelVisible = true;
+
+        // Background: translucent, so the world (and anything below) stays visible
+        int alpha = Math.round(255 * Configs.Generic.ASSISTANT_OPACITY.getIntegerValue() / 100f);
         int accent = state == BoxState.DONE ? Theme.SUCCESS : (linked ? Theme.ACCENT : Theme.BORDER_STRONG);
-        Ui.panel(ctx, x, y, width, height, 0xF2140F1C, accent);
-        Ui.rect(ctx, x + 1, y + 1, width - 2, 2, accent);
+        Ui.framed(ctx, x, y, w, h, Theme.withAlpha(0x140F1C, alpha), Theme.withAlpha(accent, Math.max(alpha, 0xC0)));
+        Ui.gradient(ctx, x + 1, y + 1, w - 2, TITLE_HEIGHT - 1, Theme.withAlpha(accent, Math.min(255, alpha / 2 + 0x40)),
+                    Theme.withAlpha(0x2B2238, Math.min(255, alpha + 0x20)));
+        Ui.hline(ctx, x + 1, y + TITLE_HEIGHT, w - 2, Theme.withAlpha(accent, 0x90));
 
-        int tx = x + 7;
-        int ty = y + 7;
-        int inner = width - 14;
+        int tx = x + PAD;
+        int right = x + w - PAD;
 
-        // Header: shulker icon, box number, link state
-        PlannerProject project = session.getProject();
+        // Title bar: drag handle, shulker icon, box number, state chip, reset button
+        boolean overTitle = Ui.inside(mouseX, mouseY, x, y, w, TITLE_HEIGHT) && drag == Drag.NONE;
+        Ui.dragHandle(ctx, tx, y + 6, overTitle || drag == Drag.MOVE ? Theme.TEXT : Theme.TEXT_MUTED);
         ItemStack icon = project != null ? new ItemStack(project.getShulkerItem(target.getIndex())) : new ItemStack(Items.SHULKER_BOX);
-        Ui.item(ctx, icon, tx, ty);
-        String title = StringUtils.translate("shulkerplanner.assistant.box", target.getIndex(), plan.getBoxCount());
-        Ui.textShadow(ctx, title, tx + 20, ty + 1, Theme.TEXT);
+        Ui.item(ctx, icon, tx + 8, y + 4, 12, false);
 
+        // Small square buttons on the right of the title bar: follow on the HUD, put the panel back
+        int small = 14;
+        int resetX = right - small;
+        int hudX = resetX - 3 - small;
+        boolean hoverReset = Ui.inside(mouseX, mouseY, resetX, y + 3, small, small) && drag == Drag.NONE;
+        boolean hoverHud = Ui.inside(mouseX, mouseY, hudX, y + 3, small, small) && drag == Drag.NONE;
+        LayoutProbe.add(LayoutProbe.Kind.BUTTON, "reset", resetX, y + 3, small, small);
+        Ui.button3d(ctx, resetX, y + 3, small, small, hoverReset ? Ui.BEVEL_QUIET.hovered() : Ui.BEVEL_QUIET, false);
+        Ui.resetIcon(ctx, resetX + 4, y + 5, hoverReset ? Theme.TEXT : Theme.TEXT_DIM);
+        buttons.add(new Button(resetX, y + 3, small, small, () -> {
+            resetGeometry();
+            scroll = 0;
+        }));
+
+        Ui.Bevel hudBevel = followed ? Ui.BEVEL_ACTIVE : Ui.BEVEL_QUIET;
+        LayoutProbe.add(LayoutProbe.Kind.BUTTON, "hud", hudX, y + 3, small, small);
+        Ui.button3d(ctx, hudX, y + 3, small, small, hoverHud ? hudBevel.hovered() : hudBevel, followed);
+        Ui.followIcon(ctx, hudX + 4, y + (followed ? 6 : 5), followed, followed ? Theme.ACCENT_HOVER : (hoverHud ? Theme.TEXT : Theme.TEXT_DIM));
+        PlannedBox hudBox = target;
+        buttons.add(new Button(hudX, y + 3, small, small, () -> session.setFollowedBox(followed ? null : hudBox)));
+
+        int titleX = tx + 24;
+        String title = StringUtils.translate("shulkerplanner.assistant.box", target.getIndex(), plan.getBoxCount());
+        Ui.textShadow(ctx, Ui.trim(title, hudX - 4 - titleX), titleX, y + 7, Theme.TEXT);
+
+        // State chip, progress bar and percentage on one row
         String chip;
         int chipFg;
         int chipBg;
@@ -374,15 +656,10 @@ public class PackingAssistant
             chipBg = Theme.SURFACE_3;
         }
 
-        if (linked && state != BoxState.DONE)
-        {
-            Ui.lockChip(ctx, chip, tx + 20, ty + 10, chipFg, chipBg);
-        }
-        else
-        {
-            Ui.chip(ctx, chip, tx + 20, ty + 10, chipFg, chipBg);
-        }
-        ty += 22;
+        int py = y + TITLE_HEIGHT + 4;
+        int chipW = linked && state != BoxState.DONE ? Ui.lockChip(ctx, chip, tx, py, chipFg, chipBg)
+                                                     : Ui.chip(ctx, chip, tx, py, chipFg, chipBg);
+        int ty = py + 1;
 
         // Progress bar
         long need = target.getItemCount();
@@ -394,68 +671,58 @@ public class PackingAssistant
         }
 
         String pct = need > 0 ? (int) (100 * inside / need) + "%" : "";
-        Ui.progress(ctx, tx, ty + 1, inner - Ui.width(pct) - 4, 5, need > 0 ? (double) inside / need : 0,
-                    complete ? Theme.SUCCESS : Theme.ACCENT, Theme.SURFACE_3);
-        Ui.textRight(ctx, pct, tx + inner, ty, Theme.TEXT_DIM);
-        ty += 12;
+        int barX = tx + chipW + 5;
+        Ui.progress(ctx, barX, ty + 2, right - Ui.width("100%") - 4 - barX, 5, need > 0 ? (double) inside / need : 0,
+                    complete ? Theme.SUCCESS : Theme.ACCENT, Theme.withAlpha(Theme.SURFACE_3, 0xFF));
+        Ui.textRight(ctx, pct, right, ty + 1, Theme.TEXT_DIM);
+        ty += 14;
 
-        // Items
-        int line = 0;
+        // The scrolled list of items
+        int bottomFixed = 13 + hintHeight + footerLines * (BUTTON_HEIGHT + 3) + 4;
+        listX = tx;
+        listY = ty;
+        listH = Math.max(ROW_HEIGHT / 2, y + h - bottomFixed - ty - 2);
+        boolean scrollable = contentHeight > listH;
+        listW = inner - (scrollable ? SCROLLBAR_WIDTH + 3 : 0);
+        scroll = Math.max(0, Math.min(scroll, getMaxScroll()));
 
-        for (Map.Entry<String, Integer> e : planned.entrySet())
+        Ui.rect(ctx, listX - 2, listY - 1, inner + 4, listH + 2, Theme.withAlpha(0x000000, Math.min(0x60, alpha / 3)));
+        Ui.pushClip(ctx, listX - 2, listY, inner + 4, listH);
+        String hoveredId = null;
+        int hoveredWant = 0;
+        int hoveredHave = 0;
+        int ry = listY - scroll;
+
+        for (Row row : rows)
         {
-            if (line++ >= MAX_ITEM_LINES)
+            if (ry + row.height() > listY && ry < listY + listH)
             {
-                break;
+                boolean hoverRow = row.header() == false && Ui.inside(mouseX, mouseY, listX, Math.max(ry, listY), listW,
+                                                                      Math.min(ry + row.height(), listY + listH) - Math.max(ry, listY));
+                if (hoverRow && drag == Drag.NONE)
+                {
+                    Ui.rect(ctx, listX - 2, ry, listW + 2, row.height(), Theme.withAlpha(0xFFFFFF, 0x14));
+                    hoveredId = row.id();
+                    hoveredWant = row.want();
+                    hoveredHave = row.have();
+                }
+
+                drawRow(ctx, screen.getMenu(), row, target, ry);
             }
 
-            int want = e.getValue();
-            int have = contents.getOrDefault(e.getKey(), 0);
-            ItemRequirement req = target.getItems().get(e.getKey());
-            Ui.item(ctx, req.proto(), tx, ty);
-
-            int color = have == want ? Theme.SUCCESS : (have > want ? Theme.WARN : (have > 0 ? Theme.TEXT : Theme.TEXT_DIM));
-            String mark = have == want ? "✔ " : (have > want ? "▲ " : "");
-            String count = mark + Format.number(have) + "/" + Format.number(want);
-            Ui.text(ctx, count, tx + 19, ty, color);
-            int cw = Ui.width(count);
-            Ui.text(ctx, Ui.trim(req.proto().getHoverName().getString(), inner - 23 - cw), tx + 23 + cw, ty, Theme.TEXT_DIM);
-
-            if (have < want)
-            {
-                int inInv = countInPlayerSlots(screen.getMenu(), e.getKey());
-                String sub = StringUtils.translate("shulkerplanner.assistant.to_put_in", Format.stacks(want - have, req.maxStack()))
-                             + "  " + StringUtils.translate("shulkerplanner.assistant.in_inventory", Format.number(inInv));
-                Ui.text(ctx, Ui.trim(sub, inner - 19), tx + 19, ty + 9, inInv >= want - have ? Theme.INFO : Theme.TEXT_MUTED);
-            }
-            else if (have > want)
-            {
-                Ui.text(ctx, StringUtils.translate("shulkerplanner.assistant.too_many", Format.number(have - want)), tx + 19, ty + 9, Theme.WARN);
-            }
-
-            ty += LINE_HEIGHT;
+            ry += row.height();
         }
 
-        if (planned.size() > itemLines)
+        Ui.popClip(ctx);
+
+        if (scrollable)
         {
-            Ui.text(ctx, StringUtils.translate("shulkerplanner.gui.label.box.more", planned.size() - itemLines), tx, ty, Theme.TEXT_MUTED);
-            ty += 10;
+            int sbx = listX + inner - SCROLLBAR_WIDTH;
+            boolean hoverBar = Ui.inside(mouseX, mouseY, sbx, listY, SCROLLBAR_WIDTH, listH) || drag == Drag.SCROLLBAR;
+            Ui.scrollbar(ctx, sbx, listY, SCROLLBAR_WIDTH, listH, scroll, getMaxScroll(), listH, hoverBar);
         }
 
-        if (wrongLines > 0)
-        {
-            Ui.text(ctx, "⚠ " + StringUtils.translate("shulkerplanner.assistant.remove"), tx, ty + 2, Theme.DANGER);
-            ty += 12;
-
-            for (int i = 0; i < wrongLines; ++i)
-            {
-                String id = wrong.get(i);
-                ItemStack stack = new MaterialRow(id, 0, 0).getStack();
-                Ui.item(ctx, stack, tx, ty);
-                Ui.text(ctx, Ui.trim(Format.number(contents.get(id)) + "  " + stack.getHoverName().getString(), inner - 20), tx + 19, ty + 4, Theme.DANGER);
-                ty += LINE_HEIGHT;
-            }
-        }
+        ty = listY + listH + 4;
 
         // Status
         String status;
@@ -472,7 +739,7 @@ public class PackingAssistant
             status = StringUtils.translate("shulkerplanner.assistant.complete");
             statusColor = Theme.SUCCESS;
         }
-        else if (wrong.isEmpty() == false && showWrong)
+        else if (showWrong)
         {
             status = StringUtils.translate("shulkerplanner.assistant.wrong_items");
             statusColor = Theme.DANGER;
@@ -483,73 +750,193 @@ public class PackingAssistant
             statusColor = Theme.WARN;
         }
 
-        Ui.text(ctx, Ui.trim(status, inner), tx, ty + 3, statusColor);
-        ty += 14;
+        Ui.textShadow(ctx, Ui.trim(status, inner), tx, ty, statusColor);
+        ty += 13;
 
         if (hint)
         {
-            Ui.panel(ctx, tx - 2, ty, inner + 4, 20, Theme.INFO_BG);
-            Ui.text(ctx, Ui.trim(StringUtils.translate("shulkerplanner.assistant.hint_unlinked1"), inner), tx + 1, ty + 2, Theme.INFO);
-            Ui.text(ctx, Ui.trim(StringUtils.translate("shulkerplanner.assistant.hint_unlinked2"), inner), tx + 1, ty + 11, Theme.TEXT_DIM);
-            ty += 22;
+            Ui.panel(ctx, tx - 2, ty - 2, inner + 4, 22, Theme.withAlpha(Theme.INFO, 0x38));
+            Ui.text(ctx, Ui.trim(StringUtils.translate("shulkerplanner.assistant.hint_unlinked1"), inner - 2), tx + 1, ty, Theme.INFO);
+            Ui.text(ctx, Ui.trim(StringUtils.translate("shulkerplanner.assistant.hint_unlinked2"), inner - 2), tx + 1, ty + 10, Theme.TEXT);
+            ty += hintHeight;
         }
 
-        // Actions
-        int by = ty + 2;
+        // Actions, wrapping to the next line when they don't fit, never under the resize grip
+        int bx = tx;
+        int by = ty;
+        int flowRight = right - GRIP;
+        List<Runnable> actions = new ArrayList<>();
+        List<PlannedBox> boxes = plan.getBoxes();
+        int index = boxes.indexOf(target);
+        int count = boxes.size();
+        PlannedBox shown = target;
+        BoxState shownState = state;
 
         if (linked)
         {
-            int bx = tx;
-            bx += button(ctx, mouseX, mouseY, bx, by, "✕ " + StringUtils.translate("shulkerplanner.assistant.unlink"), false,
-                         () -> { session.unlink(target); binding = null; previewId = target.getId(); }) + 3;
-
-            String doneLabel = state == BoxState.DONE ? StringUtils.translate("shulkerplanner.assistant.undo_done")
-                                                      : "✔ " + StringUtils.translate("shulkerplanner.assistant.mark_done");
-            bx += button(ctx, mouseX, mouseY, bx, by, doneLabel, false,
-                         () -> session.setBoxState(target, state == BoxState.DONE ? BoxState.FILLING : BoxState.DONE)) + 3;
-
-            boolean followed = session.isFollowed(target);
-            button(ctx, mouseX, mouseY, bx, by, followed ? "◉ HUD" : "○ HUD", followed,
-                   () -> session.setFollowedBox(followed ? null : target));
+            actions.add(() -> { session.unlink(shown); binding = null; previewId = shown.getId(); });
+            actions.add(() -> session.setBoxState(shown, shownState == BoxState.DONE ? BoxState.FILLING : BoxState.DONE));
         }
         else
         {
-            int count = plan.getBoxCount();
-            List<PlannedBox> boxes = plan.getBoxes();
-            int index = boxes.indexOf(target);
-            int bx = tx;
-            bx += button(ctx, mouseX, mouseY, bx, by, "◀", false, () -> previewId = boxes.get(Math.floorMod(index - 1, count)).getId()) + 2;
-            bx += button(ctx, mouseX, mouseY, bx, by, "▶", false, () -> previewId = boxes.get(Math.floorMod(index + 1, count)).getId()) + 4;
+            actions.add(() -> previewId = boxes.get(Math.floorMod(index - 1, count)).getId());
+            actions.add(() -> previewId = boxes.get(Math.floorMod(index + 1, count)).getId());
+            actions.add(canLink ? () -> link(shown, contents) : null);
+        }
 
-            ShulkerBinding other = session.getBinding(target);
-            String label = "+ " + StringUtils.translate("shulkerplanner.assistant.link", target.getIndex());
-            boolean canLink = other == null;
+        for (int i = 0; i < labels.size(); ++i)
+        {
+            String label = labels.get(i);
+            Runnable action = actions.get(i);
+            int bw = Ui.width(label) + 10;
 
-            if (canLink)
+            if (bx > tx && bx + bw > flowRight)
             {
-                button(ctx, mouseX, mouseY, bx, by, label, true, () -> link(target, contents));
+                bx = tx;
+                by += BUTTON_HEIGHT + 3;
             }
-            else
+
+            bw = Math.min(bw, flowRight - bx);
+
+            if (action == null)
             {
-                Ui.text(ctx, Ui.trim(StringUtils.translate("shulkerplanner.assistant.already_linked"), tx + inner - bx), bx, by + 5, Theme.TEXT_MUTED);
+                Ui.text(ctx, Ui.trim(label, flowRight - bx), bx, by + 4, Theme.TEXT_MUTED);
+                continue;
+            }
+
+            boolean primary = linked == false && i == 2;
+            boolean hover = Ui.inside(mouseX, mouseY, bx, by, bw, BUTTON_HEIGHT) && drag == Drag.NONE;
+            Ui.Bevel bevel = primary ? Ui.BEVEL_PRIMARY : Ui.BEVEL_SECONDARY;
+            Ui.button3dLabel(ctx, bx, by, bw, BUTTON_HEIGHT, Ui.trim(label, bw - 6), hover ? bevel.hovered() : bevel, false,
+                             primary ? 0xFFFFFFFF : Theme.TEXT);
+            buttons.add(new Button(bx, by, bw, BUTTON_HEIGHT, action));
+            bx += bw + 3;
+        }
+
+        // Resize grip in the bottom right corner
+        boolean overGrip = Ui.inside(mouseX, mouseY, x + w - GRIP - 1, y + h - GRIP - 1, GRIP + 1, GRIP + 1) || drag == Drag.RESIZE;
+        Ui.resizeGrip(ctx, x + w - 2, y + h - 2, overGrip ? Theme.TEXT : Theme.withAlpha(accent, 0xC0));
+        LayoutProbe.add(LayoutProbe.Kind.BUTTON, "resize", x + w - GRIP - 1, y + h - GRIP - 1, GRIP, GRIP);
+
+        // Tooltips last, above everything
+        if (drag == Drag.NONE)
+        {
+            if (hoveredId != null)
+            {
+                drawRowTooltip(ctx, screen.getMenu(), mouseX, mouseY, target, hoveredId, hoveredWant, hoveredHave);
+            }
+            else if (hoverReset)
+            {
+                Ui.tooltip(ctx, mouseX, mouseY, List.of(StringUtils.translate("shulkerplanner.assistant.hover.reset")));
+            }
+            else if (hoverHud)
+            {
+                Ui.tooltip(ctx, mouseX, mouseY, List.of(StringUtils.translate(followed ? "shulkerplanner.assistant.hover.hud_on"
+                                                                                       : "shulkerplanner.assistant.hover.hud_off")));
+            }
+            else if (overTitle)
+            {
+                Ui.tooltip(ctx, mouseX, mouseY, List.of(StringUtils.translate("shulkerplanner.assistant.hover.move")));
+            }
+            else if (overGrip)
+            {
+                Ui.tooltip(ctx, mouseX, mouseY, List.of(StringUtils.translate("shulkerplanner.assistant.hover.resize")));
             }
         }
     }
 
-    /**
-     * Draws a small flat button and registers its click area
-     * @return the width
-     */
-    private static int button(GuiContext ctx, int mouseX, int mouseY, int x, int y, String label, boolean primary, Runnable action)
+    private static void drawRow(GuiContext ctx, AbstractContainerMenu menu, Row row, PlannedBox target, int y)
     {
-        int w = Ui.width(label) + 10;
-        int h = 16;
-        boolean hover = Ui.inside(mouseX, mouseY, x, y, w, h);
-        int bg = primary ? (hover ? Theme.ACCENT_HOVER : Theme.ACCENT) : (hover ? Theme.SURFACE_HOVER : Theme.SURFACE_3);
-        Ui.panel(ctx, x, y, w, h, bg, primary ? bg : (hover ? Theme.BORDER_STRONG : Theme.BORDER));
-        Ui.text(ctx, label, x + 5, y + 4, primary ? 0xFFFFFFFF : Theme.TEXT);
-        buttons.add(new Button(x, y, w, h, action));
-        return w;
+        int x = listX;
+        int w = listW;
+
+        if (row.header())
+        {
+            Ui.text(ctx, "⚠ " + StringUtils.translate("shulkerplanner.assistant.remove"), x, y + 2, Theme.DANGER);
+            return;
+        }
+
+        if (row.wrong())
+        {
+            ItemStack stack = new MaterialRow(row.id(), 0, 0).getStack();
+            Ui.item(ctx, stack, x, y + 2);
+            String text = Format.number(row.have()) + "  " + stack.getHoverName().getString();
+            Ui.text(ctx, Ui.trim(text, w - 20), x + 19, y + 6, Theme.DANGER);
+            return;
+        }
+
+        int want = row.want();
+        int have = row.have();
+        ItemRequirement req = target.getItems().get(row.id());
+        Ui.item(ctx, req.proto(), x, y + 2);
+
+        int color = have == want ? Theme.SUCCESS : (have > want ? Theme.WARN : (have > 0 ? Theme.TEXT : Theme.TEXT_DIM));
+        String mark = have == want ? "✔ " : (have > want ? "▲ " : "");
+        String count = mark + Format.number(have) + "/" + Format.number(want);
+        int cw = Ui.width(count);
+
+        if (cw > w - 20)
+        {
+            count = Ui.trim(count, w - 20);
+            cw = Ui.width(count);
+        }
+
+        Ui.text(ctx, count, x + 19, y + 2, color);
+        String name = Ui.trim(req.proto().getHoverName().getString(), w - 23 - cw);
+
+        if (name.isEmpty() == false)
+        {
+            Ui.text(ctx, name, x + 23 + cw, y + 2, Theme.TEXT_DIM);
+        }
+
+        String sub = null;
+        int subColor = Theme.TEXT_MUTED;
+
+        if (have < want)
+        {
+            int inInv = countInPlayerSlots(menu, row.id());
+            sub = StringUtils.translate("shulkerplanner.assistant.to_put_in", Format.stacks(want - have, req.maxStack()))
+                  + "  " + StringUtils.translate("shulkerplanner.assistant.in_inventory", Format.number(inInv));
+            subColor = inInv >= want - have ? Theme.INFO : Theme.TEXT_MUTED;
+        }
+        else if (have > want)
+        {
+            sub = StringUtils.translate("shulkerplanner.assistant.too_many", Format.number(have - want));
+            subColor = Theme.WARN;
+        }
+
+        if (sub != null)
+        {
+            Ui.text(ctx, Ui.trim(sub, w - 19), x + 19, y + 11, subColor);
+        }
+    }
+
+    private static void drawRowTooltip(GuiContext ctx, AbstractContainerMenu menu, int mouseX, int mouseY,
+                                       PlannedBox target, String id, int want, int have)
+    {
+        ItemRequirement req = target.getItems().get(id);
+        ItemStack stack = req != null ? req.proto() : new MaterialRow(id, 0, 0).getStack();
+        int maxStack = stack.getMaxStackSize();
+        List<String> lines = new ArrayList<>();
+        lines.add(GuiBase.TXT_BOLD + stack.getHoverName().getString());
+
+        if (req == null)
+        {
+            lines.add(GuiBase.TXT_RED + StringUtils.translate("shulkerplanner.assistant.hover.wrong", Format.number(have)));
+        }
+        else
+        {
+            lines.add(StringUtils.translate("shulkerplanner.assistant.hover.in_box", Format.number(have), Format.number(want), Format.stacks(want, maxStack)));
+
+            if (have < want)
+            {
+                lines.add(GuiBase.TXT_AQUA + StringUtils.translate("shulkerplanner.assistant.to_put_in", Format.stacks(want - have, maxStack)));
+            }
+
+            lines.add(GuiBase.TXT_GRAY + StringUtils.translate("shulkerplanner.assistant.in_inventory", Format.number(countInPlayerSlots(menu, id))));
+        }
+
+        Ui.tooltip(ctx, mouseX, mouseY, lines);
     }
 
     private static int countInPlayerSlots(AbstractContainerMenu menu, String id)
@@ -616,27 +1003,140 @@ public class PackingAssistant
         }
     }
 
-    /**
-     * @return true if the click was handled by the assistant panel
-     */
-    public static boolean onMouseClicked(AbstractContainerScreen<?> screen, double mouseX, double mouseY)
+    // ---------------------------------------------------------------- input
+
+    private static boolean isOurs(AbstractContainerScreen<?> screen)
     {
-        if (screen != lastScreen || isActive(screen) == false)
+        return screen == lastScreen && panelVisible && isActive(screen);
+    }
+
+    private static void playClick()
+    {
+        Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0f));
+    }
+
+    /**
+     * @return true if the click was on the panel. Every click on the panel is used by it,
+     * so nothing behind it (slots, or "clicked outside" dropping the carried item) gets it.
+     */
+    public static boolean onMouseClicked(AbstractContainerScreen<?> screen, double mouseX, double mouseY, int button)
+    {
+        pressedInPanel = false;
+
+        if (isOurs(screen) == false || isMouseOverPanel(mouseX, mouseY) == false)
         {
             return false;
         }
 
-        for (Button button : List.copyOf(buttons))
+        pressedInPanel = true;
+
+        if (button != 0)
         {
-            if (button.contains(mouseX, mouseY))
+            return true;
+        }
+
+        for (Button b : List.copyOf(buttons))
+        {
+            if (b.contains(mouseX, mouseY))
             {
-                button.action().run();
-                Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(
-                        net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.0f));
+                b.action().run();
+                playClick();
                 return true;
             }
         }
 
-        return false;
+        dragStartX = mouseX;
+        dragStartY = mouseY;
+        dragStartPanelX = panelX;
+        dragStartPanelY = panelY;
+        dragStartW = panelW;
+        dragStartH = panelH;
+        dragStartScroll = scroll;
+
+        if (Ui.inside(mouseX, mouseY, panelX + panelW - GRIP - 1, panelY + panelH - GRIP - 1, GRIP + 1, GRIP + 1))
+        {
+            drag = Drag.RESIZE;
+        }
+        else if (Ui.inside(mouseX, mouseY, panelX, panelY, panelW, TITLE_HEIGHT))
+        {
+            drag = Drag.MOVE;
+        }
+        else if (getMaxScroll() > 0 && Ui.inside(mouseX, mouseY, listX + listW, listY, panelX + panelW - PAD - (listX + listW) + 1, listH))
+        {
+            // Click on the scroll bar track: jump there, then drag
+            int thumb = Math.max(10, listH * listH / (contentHeight));
+            double f = (mouseY - listY - thumb / 2.0) / Math.max(1, listH - thumb);
+            scroll = (int) Math.round(Math.max(0, Math.min(1, f)) * getMaxScroll());
+            dragStartScroll = scroll;
+            drag = Drag.SCROLLBAR;
+        }
+
+        return true;
+    }
+
+    public static boolean onMouseDragged(AbstractContainerScreen<?> screen, double mouseX, double mouseY)
+    {
+        if (isOurs(screen) == false || drag == Drag.NONE)
+        {
+            return pressedInPanel && isOurs(screen);
+        }
+
+        int dx = (int) Math.round(mouseX - dragStartX);
+        int dy = (int) Math.round(mouseY - dragStartY);
+
+        switch (drag)
+        {
+            case MOVE -> {
+                panelX = Math.max(2, Math.min(dragStartPanelX + dx, screen.width - panelW - 2));
+                panelY = Math.max(2, Math.min(dragStartPanelY + dy, screen.height - panelH - 2));
+                storeAnchor(panelX, panelY, panelW);
+            }
+            case RESIZE -> {
+                panelW = Math.max(MIN_WIDTH, Math.min(dragStartW + dx, screen.width - panelX - 2));
+                panelH = Math.max(Math.min(MIN_HEIGHT, screen.height - 4), Math.min(dragStartH + dy, screen.height - panelY - 2));
+                Configs.Generic.ASSISTANT_WIDTH.setIntegerValue(panelW);
+                Configs.Generic.ASSISTANT_HEIGHT.setIntegerValue(panelH);
+                storeAnchor(panelX, panelY, panelW);
+            }
+            case SCROLLBAR -> {
+                int thumb = Math.max(10, listH * listH / Math.max(1, contentHeight));
+                int track = Math.max(1, listH - thumb);
+                scroll = Math.max(0, Math.min(getMaxScroll(), dragStartScroll + (int) Math.round((mouseY - dragStartY) * getMaxScroll() / track)));
+            }
+            default -> {
+            }
+        }
+
+        return true;
+    }
+
+    public static boolean onMouseReleased(AbstractContainerScreen<?> screen)
+    {
+        boolean used = pressedInPanel && isOurs(screen);
+
+        if (drag == Drag.MOVE || drag == Drag.RESIZE)
+        {
+            Configs.saveToFile();
+            used = true;
+        }
+
+        drag = Drag.NONE;
+        pressedInPanel = false;
+        return used;
+    }
+
+    public static boolean onMouseScrolled(AbstractContainerScreen<?> screen, double mouseX, double mouseY, double amount)
+    {
+        if (isOurs(screen) == false || isMouseOverPanel(mouseX, mouseY) == false)
+        {
+            return false;
+        }
+
+        if (amount != 0)
+        {
+            scroll = Math.max(0, Math.min(getMaxScroll(), scroll - (int) Math.round(amount * ROW_HEIGHT)));
+        }
+
+        return true;
     }
 }

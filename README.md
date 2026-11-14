@@ -41,6 +41,7 @@ Open any shulker box and a panel appears next to it.
 - **The link follows the shulker box.** Break it, carry it, place it somewhere else: it's still that box (recognised by color, name and contents).
 - It shows what is already inside, what's still missing and how much of it you're carrying. Items to move in are highlighted **green**, wrong items **red**, too many **orange**.
 - When a linked box matches the plan it's marked as ready on its own. *Unlink*, *Mark done* and *Follow on HUD* are one click away.
+- **Your panel, your place.** It's anchored to the shulker box screen: drag it by its title bar, resize it from the bottom right corner, and it stays there (relative to the box screen) every time you open one, at any GUI scale. The ↺ button puts it back. The list scrolls with the mouse wheel, and the background is see-through (opacity in *Settings*).
 
 <p align="center">
   <img src="docs/images/screenshots/packing-assistant-unlinked.png" width="49%">

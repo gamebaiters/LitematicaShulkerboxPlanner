@@ -10,7 +10,7 @@ import fi.dy.masa.malilib.gui.Message.MessageType;
 import fi.dy.masa.malilib.util.StringUtils;
 
 import it.marco.shulkerplanner.data.PlannerProject;
-import it.marco.shulkerplanner.gui.ui.FlatButton;
+import it.marco.shulkerplanner.gui.ui.PlannerButton;
 import it.marco.shulkerplanner.gui.ui.Theme;
 import it.marco.shulkerplanner.gui.widgets.WidgetListPlannerRaw;
 import it.marco.shulkerplanner.gui.widgets.WidgetPlannerRawEntry;
@@ -81,7 +81,7 @@ public class GuiPlannerRaw extends GuiPlannerBase<RawRow, WidgetPlannerRawEntry,
             return;
         }
 
-        FlatButton button = this.createToggle("shulkerplanner.gui.button.pack_raw", project.getPackRawMaterials(),
+        PlannerButton button = this.createToggle("shulkerplanner.gui.button.pack_raw", project.getPackRawMaterials(),
                                               StringUtils.translate("shulkerplanner.gui.button.pack_raw.hover"));
         this.addFlowButton(button, (btn, mb) -> {
             project.setPackRawMaterials(! project.getPackRawMaterials());

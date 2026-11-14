@@ -16,11 +16,12 @@ import fi.dy.masa.malilib.gui.widgets.WidgetSearchBar;
 import fi.dy.masa.malilib.render.GuiContext;
 import fi.dy.masa.malilib.util.StringUtils;
 
+import it.marco.shulkerplanner.gui.ui.Ui;
 import it.marco.shulkerplanner.data.MaterialRow;
 import java.util.Map;
 import it.marco.shulkerplanner.data.PlannerProject;
 import it.marco.shulkerplanner.data.PlannerSession;
-import it.marco.shulkerplanner.gui.ui.FlatButton;
+import it.marco.shulkerplanner.gui.ui.PlannerButton;
 import it.marco.shulkerplanner.gui.GuiPlannerMaterials;
 import it.marco.shulkerplanner.util.Format;
 
@@ -35,6 +36,7 @@ public class WidgetListPlannerMaterials extends WidgetListBase<MaterialRow, Widg
     public WidgetListPlannerMaterials(int x, int y, int width, int height, GuiPlannerMaterials gui)
     {
         super(x, y, width, height, null);
+        Ui.styleScrollbar(this.getScrollbar());
 
         this.gui = gui;
         this.browserEntryHeight = 22;
@@ -208,10 +210,10 @@ public class WidgetListPlannerMaterials extends WidgetListBase<MaterialRow, Widg
             this.packed = session.getPackedCounts();
             this.carrying = session.getCarryingCounts();
 
-            this.widthInclude = Math.max(FlatButton.autoWidth(StringUtils.translate("shulkerplanner.gui.button.include"), true, null),
-                                         FlatButton.autoWidth(StringUtils.translate("shulkerplanner.gui.button.include"), true, null));
-            this.widthGathered = FlatButton.autoWidth(StringUtils.translate("shulkerplanner.gui.button.gathered_short"), true, null);
-            this.widthNote = FlatButton.autoWidth("+", false, null) + 2;
+            this.widthInclude = Math.max(PlannerButton.autoWidth(StringUtils.translate("shulkerplanner.gui.button.include"), true, null),
+                                         PlannerButton.autoWidth(StringUtils.translate("shulkerplanner.gui.button.include"), true, null));
+            this.widthGathered = PlannerButton.autoWidth(StringUtils.translate("shulkerplanner.gui.button.gathered_short"), true, null);
+            this.widthNote = PlannerButton.autoWidth("+", false, null) + 2;
             this.buttonsWidth = this.widthInclude + this.widthGathered + this.widthNote + 8;
 
             int nameW = header("item");

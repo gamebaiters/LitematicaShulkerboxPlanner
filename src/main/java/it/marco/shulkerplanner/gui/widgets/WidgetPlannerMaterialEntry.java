@@ -18,7 +18,7 @@ import it.marco.shulkerplanner.data.PlannerProject;
 import it.marco.shulkerplanner.data.PlannerSession;
 import it.marco.shulkerplanner.data.Reminder;
 import it.marco.shulkerplanner.gui.GuiPlannerMaterials;
-import it.marco.shulkerplanner.gui.ui.FlatButton;
+import it.marco.shulkerplanner.gui.ui.PlannerButton;
 import it.marco.shulkerplanner.gui.ui.Theme;
 import it.marco.shulkerplanner.gui.ui.Ui;
 import it.marco.shulkerplanner.util.Format;
@@ -49,7 +49,7 @@ public class WidgetPlannerMaterialEntry extends WidgetListEntryBase<MaterialRow>
             int xRight = x + width - 4;
             int by = y + 2;
 
-            FlatButton include = FlatButton.toggle(StringUtils.translate("shulkerplanner.gui.button.include"), project.isExcluded(id) == false,
+            PlannerButton include = PlannerButton.toggle(StringUtils.translate("shulkerplanner.gui.button.include"), project.isExcluded(id) == false,
                                                    StringUtils.translate("shulkerplanner.gui.button.include.hover"));
             include.setPosition(xRight - this.layout.widthInclude, by);
             include.setWidth(this.layout.widthInclude);
@@ -59,7 +59,7 @@ public class WidgetPlannerMaterialEntry extends WidgetListEntryBase<MaterialRow>
             });
             xRight = include.getX() - 4;
 
-            FlatButton gathered = FlatButton.toggle(StringUtils.translate("shulkerplanner.gui.button.gathered_short"), project.isGathered(id),
+            PlannerButton gathered = PlannerButton.toggle(StringUtils.translate("shulkerplanner.gui.button.gathered_short"), project.isGathered(id),
                                                     StringUtils.translate("shulkerplanner.gui.button.gathered.hover"));
             gathered.setPosition(xRight - this.layout.widthGathered, by);
             gathered.setWidth(this.layout.widthGathered);
@@ -69,7 +69,7 @@ public class WidgetPlannerMaterialEntry extends WidgetListEntryBase<MaterialRow>
             });
             xRight = gathered.getX() - 4;
 
-            FlatButton note = new FlatButton(xRight - this.layout.widthNote, by, this.layout.widthNote, "+", FlatButton.Style.GHOST,
+            PlannerButton note = new PlannerButton(xRight - this.layout.widthNote, by, this.layout.widthNote, "+", PlannerButton.Style.GHOST,
                                              StringUtils.translate("shulkerplanner.gui.button.add_note.hover"));
             this.addButton(note, (btn, mb) -> this.addReminder(project, entry));
         }

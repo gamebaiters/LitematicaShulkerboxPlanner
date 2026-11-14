@@ -56,6 +56,9 @@ import it.marco.shulkerplanner.hud.HudTheme;
 import it.marco.shulkerplanner.gui.GuiPlannerConfigs;
 import it.marco.shulkerplanner.gui.PlannerGuis;
 import it.marco.shulkerplanner.gui.PlannerTab;
+import it.marco.shulkerplanner.gui.ui.LayoutProbe;
+import it.marco.shulkerplanner.gui.ui.Ui;
+import it.marco.shulkerplanner.render.PackingAssistant;
 import it.marco.shulkerplanner.plan.BoxProgress;
 import it.marco.shulkerplanner.plan.PlannedBox;
 import it.marco.shulkerplanner.plan.PlannedStack;
@@ -108,10 +111,19 @@ public class ShulkerPlannerClientGameTest implements FabricClientGameTest
             sp.getServer().runCommand("time set 6000");
             ctx.waitTicks(40);
 
-            this.functionalChecks(ctx, sp);
-            this.placementSelectionChecks(ctx, sp);
-            this.linkingChecks(ctx, sp);
+            // LSP_ONLY=layout: only the screenshots, the layout and the assistant panel checks
+            boolean layoutOnly = "layout".equals(System.getenv("LSP_ONLY"));
+
+            if (layoutOnly == false)
+            {
+                this.functionalChecks(ctx, sp);
+                this.placementSelectionChecks(ctx, sp);
+                this.linkingChecks(ctx, sp);
+            }
+
             this.showcase(ctx, sp);
+            this.assistantPanelChecks(ctx, sp);
+            this.layoutChecks(ctx, sp);
 
             log("ALL CHECKS PASSED");
         }
@@ -820,6 +832,349 @@ public class ShulkerPlannerClientGameTest implements FabricClientGameTest
         ctx.runOnClient(mc -> mc.gui.setScreen(null));
     }
 
+    // ------------------------------------------------------------------ packing assistant panel: anchored, moved, resized, scrolled
+
+    /**
+     * Places a shulker box in front of the player with part of the box of the plan that has the most item types,
+     * plus a wrong item, so that the panel has more rows than fit and a "remove" section
+     */
+    private BlockPos placeMixedShulker(ClientGameTestContext ctx, TestSingleplayerContext sp)
+    {
+        int mixed = ctx.computeOnClient(mc -> {
+            List<PlannedBox> boxes = PlannerSession.INSTANCE.getPlan().getBoxes();
+            int best = 0;
+
+            for (int i = 0; i < boxes.size(); ++i)
+            {
+                if (boxes.get(i).getTotals().size() > boxes.get(best).getTotals().size())
+                {
+                    best = i;
+                }
+            }
+
+            return best;
+        });
+
+        BlockPos pos = sp.getServer().computeOnServer(server -> {
+            BlockPos p = server.getPlayerList().getPlayers().getFirst().blockPosition().offset(1, 0, 2);
+            command(server, "setblock " + p.getX() + " " + p.getY() + " " + p.getZ() + " air");
+            command(server, "setblock " + p.getX() + " " + p.getY() + " " + p.getZ() + " lime_shulker_box");
+            return p;
+        });
+        ctx.waitTicks(5);
+
+        List<ItemStack> stacks = ctx.computeOnClient(mc -> {
+            List<ItemStack> list = new ArrayList<>();
+
+            for (PlannedStack ps : PlannerSession.INSTANCE.getPlan().getBoxes().get(mixed).getSlots())
+            {
+                list.add(ps.createStack());
+            }
+
+            return list;
+        });
+
+        fillShulker(sp, pos, stacks, 0, Math.min(stacks.size(), 4));
+        sp.getServer().runOnServer(server -> {
+            ShulkerBoxBlockEntity be = (ShulkerBoxBlockEntity) server.getPlayerList().getPlayers().getFirst().level().getBlockEntity(pos);
+            be.setItem(26, new ItemStack(BuiltInRegistries.ITEM.getValue(Identifier.parse("minecraft:dirt")), 23));
+        });
+
+        log("Mixed box for the panel checks: #%d with %d item types", mixed + 1,
+            ctx.computeOnClient(mc -> PlannerSession.INSTANCE.getPlan().getBoxes().get(mixed).getTotals().size()));
+        return pos;
+    }
+
+    private void assistantPanelChecks(ClientGameTestContext ctx, TestSingleplayerContext sp)
+    {
+        ctx.runOnClient(mc -> {
+            mc.gui.setScreen(null);
+            PackingAssistant.resetGeometry();
+            Configs.Generic.ASSISTANT_OPACITY.setIntegerValue(60);
+        });
+        setGuiScale(ctx, 3);
+        BlockPos pos = this.placeMixedShulker(ctx, sp);
+        clickBlock(ctx, pos);
+        ctx.waitForScreen(ShulkerBoxScreen.class);
+        ctx.waitTicks(10);
+
+        // Anchored: right next to the container screen, top aligned, as tall as it
+        int[] b0 = ctx.computeOnClient(mc -> PackingAssistant.getPanelBounds());
+        int[] screen = ctx.computeOnClient(mc -> new int[] { mc.gui.screen().width, mc.gui.screen().height });
+        int left = (screen[0] - 176) / 2;
+        int top = (screen[1] - 167) / 2;
+        log("Panel %d,%d %dx%d next to the container at %d,%d", b0[0], b0[1], b0[2], b0[3], left, top);
+        check(b0[2] > 0, "the packing assistant panel is not shown");
+        check(b0[0] == left + 176 + 4 && b0[1] == top, "the panel is not anchored next to the container screen");
+        check(b0[3] == 167, "the panel is not as tall as the container screen: " + b0[3]);
+
+        // Mouse wheel over the list
+        int[] s0 = ctx.computeOnClient(mc -> PackingAssistant.getScroll());
+        check(s0[0] == 0 && s0[1] > 0, "the list of the panel should be scrollable, max scroll " + s0[1]);
+        int[] s1 = ctx.computeOnClient(mc -> {
+            mc.gui.screen().mouseScrolled(b0[0] + 30, b0[1] + 60, 0, -1);
+            return PackingAssistant.getScroll();
+        });
+        log("Scroll after one wheel notch: %d / %d", s1[0], s1[1]);
+        check(s1[0] == Math.min(20, s1[1]), "one wheel notch did not scroll the list by one row");
+        shot(ctx, "12_panel_scrolled");
+        int[] s2 = ctx.computeOnClient(mc -> {
+            for (int i = 0; i < 30; ++i)
+            {
+                mc.gui.screen().mouseScrolled(b0[0] + 30, b0[1] + 60, 0, -1);
+            }
+
+            return PackingAssistant.getScroll();
+        });
+        check(s2[0] == s2[1], "scrolling down did not stop at the end of the list");
+        ctx.runOnClient(mc -> mc.gui.screen().mouseScrolled(b0[0] + 30, b0[1] + 60, 0, 50));
+        check(ctx.computeOnClient(mc -> PackingAssistant.getScroll())[0] == 0, "scrolling up did not stop at the top");
+
+        // Wheel outside the panel: not used by it
+        boolean outside = ctx.computeOnClient(mc -> {
+            mc.gui.screen().mouseScrolled(b0[0] - 100, b0[1] + 60, 0, -1);
+            return PackingAssistant.getScroll()[0] == 0;
+        });
+        check(outside, "the wheel outside the panel scrolled it");
+
+        // Drag by the title bar
+        int[] b1 = ctx.computeOnClient(mc -> {
+            var s = mc.gui.screen();
+            s.mouseClicked(leftClick(b0[0] + 60, b0[1] + 8), false);
+            s.mouseDragged(leftClick(b0[0] + 80, b0[1] + 18), 20, 10);
+            s.mouseDragged(leftClick(b0[0] + 90, b0[1] + 28), 10, 10);
+            s.mouseReleased(leftClick(b0[0] + 90, b0[1] + 28));
+            return PackingAssistant.getPanelBounds();
+        });
+        ctx.waitTicks(2);
+        log("Panel dragged to %d,%d (side %d gap %d dy %d)", b1[0], b1[1], Configs.Generic.ASSISTANT_SIDE.getIntegerValue(),
+            Configs.Generic.ASSISTANT_GAP.getIntegerValue(), Configs.Generic.ASSISTANT_OFFSET_Y.getIntegerValue());
+        check(b1[0] == b0[0] + 30 && b1[1] == b0[1] + 20, "dragging the title bar did not move the panel");
+        check(Configs.Generic.ASSISTANT_GAP.getIntegerValue() == 34 && Configs.Generic.ASSISTANT_OFFSET_Y.getIntegerValue() == 20,
+              "the moved panel position was not saved relative to the container screen");
+
+        // Resize from the corner: wider and shorter, the list gets more scroll
+        int[] b2 = ctx.computeOnClient(mc -> {
+            var s = mc.gui.screen();
+            int cx = b1[0] + b1[2] - 3;
+            int cy = b1[1] + b1[3] - 3;
+            s.mouseClicked(leftClick(cx, cy), false);
+            s.mouseDragged(leftClick(cx - 20, cy - 30), -20, -30);
+            s.mouseReleased(leftClick(cx - 20, cy - 30));
+            return PackingAssistant.getPanelBounds();
+        });
+        ctx.waitTicks(2);
+        int[] s3 = ctx.computeOnClient(mc -> PackingAssistant.getScroll());
+        log("Panel resized to %dx%d, max scroll %d -> %d", b2[2], b2[3], s0[1], s3[1]);
+        check(b2[2] == b1[2] - 20 && b2[3] == b1[3] - 30, "resizing from the corner did not work");
+        check(Configs.Generic.ASSISTANT_WIDTH.getIntegerValue() == b2[2] && Configs.Generic.ASSISTANT_HEIGHT.getIntegerValue() == b2[3],
+              "the panel size was not saved");
+        check(s3[1] > s0[1], "a shorter panel should have more to scroll");
+        shot(ctx, "12b_panel_moved_resized");
+
+        // Closed and opened again: same place relative to the container screen
+        ctx.runOnClient(mc -> mc.player.closeContainer());
+        ctx.waitTicks(3);
+        clickBlock(ctx, pos);
+        ctx.waitForScreen(ShulkerBoxScreen.class);
+        ctx.waitTicks(10);
+        int[] b3 = ctx.computeOnClient(mc -> PackingAssistant.getPanelBounds());
+        check(b3[0] == b2[0] && b3[1] == b2[1] && b3[2] == b2[2] && b3[3] == b2[3], "the panel did not keep its place after opening the box again");
+
+        // Another GUI scale: still anchored to the container screen, with the same gap
+        setGuiScale(ctx, 2);
+        ctx.waitTicks(5);
+        int[] b4 = ctx.computeOnClient(mc -> PackingAssistant.getPanelBounds());
+        int[] screen2 = ctx.computeOnClient(mc -> new int[] { mc.gui.screen().width, mc.gui.screen().height });
+        int left2 = (screen2[0] - 176) / 2;
+        int top2 = (screen2[1] - 167) / 2;
+        log("At GUI scale 2 the panel is at %d,%d, the container at %d,%d", b4[0], b4[1], left2, top2);
+        check(b4[0] == left2 + 176 + 34 && b4[1] == top2 + 20, "the panel is not anchored to the container screen at another GUI scale");
+        setGuiScale(ctx, 3);
+        ctx.waitTicks(5);
+
+        // A panel moved over the container screen takes the clicks: nothing behind it is picked up
+        int[] b5 = ctx.computeOnClient(mc -> {
+            var s = mc.gui.screen();
+            int[] b = PackingAssistant.getPanelBounds();
+            s.mouseClicked(leftClick(b[0] + 60, b[1] + 8), false);
+            s.mouseDragged(leftClick(b[0] + 60 - 150, b[1] + 8), -150, 0);
+            s.mouseReleased(leftClick(b[0] + 60 - 150, b[1] + 8));
+            return PackingAssistant.getPanelBounds();
+        });
+        ctx.waitTicks(2);
+        int left3 = (screen[0] - 176) / 2;
+        int top3 = (screen[1] - 167) / 2;
+        // The first slot row of the shulker box is at y + 18, x + 8, the 4th slot has an item: click it through the panel
+        int slotX = left3 + 8 + 3 * 18 + 8;
+        int slotY = top3 + 18 + 8;
+        boolean covered = Ui.inside(slotX, slotY, b5[0], b5[1], b5[2], b5[3]);
+        boolean nothingPicked = ctx.computeOnClient(mc -> {
+            var s = mc.gui.screen();
+            s.mouseClicked(leftClick(slotX, slotY), false);
+            s.mouseReleased(leftClick(slotX, slotY));
+            return mc.player.containerMenu.getCarried().isEmpty();
+        });
+        log("Panel over the container at %d,%d, click on %d,%d (covered %s)", b5[0], b5[1], slotX, slotY, covered);
+        check(covered, "the panel was not moved over the slots");
+        check(nothingPicked, "a click on the panel picked up an item behind it");
+        shot(ctx, "12c_panel_over_container");
+
+        // The reset button puts it back
+        int[] b6 = ctx.computeOnClient(mc -> {
+            var s = mc.gui.screen();
+            int[] b = PackingAssistant.getPanelBounds();
+            s.mouseClicked(leftClick(b[0] + b[2] - 6 - 7, b[1] + 10), false);
+            s.mouseReleased(leftClick(b[0] + b[2] - 6 - 7, b[1] + 10));
+            return b;
+        });
+        ctx.waitTicks(3);
+        int[] b7 = ctx.computeOnClient(mc -> PackingAssistant.getPanelBounds());
+        check(b7[0] == b0[0] && b7[1] == b0[1] && b7[2] == b0[2] && b7[3] == b0[3], "the reset button did not put the panel back");
+        log("Panel reset from %d,%d to %d,%d", b6[0], b6[1], b7[0], b7[1]);
+
+        ctx.runOnClient(mc -> mc.player.closeContainer());
+        ctx.waitTicks(3);
+    }
+
+    // ------------------------------------------------------------------ layout: nothing overlaps, at every GUI scale
+
+    private static void setGuiScale(ClientGameTestContext ctx, int scale)
+    {
+        ctx.runOnClient(mc -> {
+            mc.options.guiScale().set(scale);
+            mc.resizeGui();
+        });
+        ctx.waitTicks(3);
+    }
+
+    private void layoutChecks(ClientGameTestContext ctx, TestSingleplayerContext sp)
+    {
+        List<String> problems = new ArrayList<>();
+        BlockPos pos = this.placeMixedShulker(ctx, sp);
+        MaterialListBase materialList = ctx.computeOnClient(mc -> PlannerSession.INSTANCE.getMaterialList());
+
+        // 1920x1080 at GUI scale 4 is what "Auto" gives, the most crowded case
+        for (int scale : new int[] { 4, 3, 2 })
+        {
+            setGuiScale(ctx, scale);
+
+            for (PlannerTab tab : PlannerTab.values())
+            {
+                ctx.runOnClient(mc -> GuiBase.openGui(PlannerGuis.create(tab, null)));
+                problems.addAll(probe(ctx, "L" + scale + "_" + tab.name().toLowerCase()));
+            }
+
+            ctx.runOnClient(mc -> GuiBase.openGui(new GuiMainMenu()));
+            problems.addAll(probe(ctx, "L" + scale + "_litematica_menu"));
+
+            if (materialList != null)
+            {
+                ctx.runOnClient(mc -> GuiBase.openGui(new GuiMaterialList(materialList)));
+                problems.addAll(probe(ctx, "L" + scale + "_material_list"));
+            }
+
+            ctx.runOnClient(mc -> mc.gui.setScreen(new GuiHudEditor(null)));
+            problems.addAll(probe(ctx, "L" + scale + "_hud_editor"));
+
+            ctx.runOnClient(mc -> mc.gui.setScreen(null));
+            ctx.waitTicks(2);
+            clickBlock(ctx, pos);
+            ctx.waitForScreen(ShulkerBoxScreen.class);
+            ctx.waitTicks(10);
+            problems.addAll(probe(ctx, "L" + scale + "_assistant_preview"));
+            ctx.runOnClient(mc -> PackingAssistant.linkOpenBox(PlannerSession.INSTANCE.getPlan().getBoxes().getLast()));
+            ctx.waitTicks(3);
+            problems.addAll(probe(ctx, "L" + scale + "_assistant_linked"));
+            ctx.runOnClient(mc -> {
+                PlannerSession.INSTANCE.unlink(PlannerSession.INSTANCE.getPlan().getBoxes().getLast());
+                mc.player.closeContainer();
+            });
+            ctx.waitTicks(3);
+        }
+
+        setGuiScale(ctx, 3);
+        ctx.runOnClient(mc -> mc.gui.setScreen(null));
+
+        if (problems.isEmpty() == false)
+        {
+            for (String p : problems)
+            {
+                log("LAYOUT %s", p);
+            }
+
+            throw new AssertionError(problems.size() + " layout problems, see the LAYOUT lines in the log");
+        }
+
+        log("Layout: no overlapping or cut off elements at GUI scales 2, 3 and 4");
+    }
+
+    /**
+     * Records what the current screen draws for a few frames, and returns the overlapping elements
+     */
+    @SuppressWarnings("unchecked")
+    private static List<String> probe(ClientGameTestContext ctx, String name)
+    {
+        ctx.getInput().setCursorPos(1919, 1079);
+        ctx.waitTicks(4);
+        ctx.runOnClient(ShulkerPlannerClientGameTest::cleanScreen);
+        ctx.runOnClient(mc -> LayoutProbe.start());
+        ctx.waitTicks(3);
+
+        List<String> problems = ctx.computeOnClient(mc -> {
+            List<LayoutProbe.Box> boxes = new ArrayList<>(LayoutProbe.stop());
+
+            // The malilib buttons and text fields that aren't drawn by the planner (Litematica's own ones)
+            if (mc.gui.screen() instanceof GuiBase gui)
+            {
+                try
+                {
+                    Field buttons = GuiBase.class.getDeclaredField("buttons");
+                    Field fields = GuiBase.class.getDeclaredField("textFields");
+                    Field text = ButtonBase.class.getDeclaredField("displayString");
+                    buttons.setAccessible(true);
+                    fields.setAccessible(true);
+                    text.setAccessible(true);
+
+                    for (ButtonBase b : (List<ButtonBase>) buttons.get(gui))
+                    {
+                        LayoutProbe.Box box = new LayoutProbe.Box(LayoutProbe.Kind.BUTTON, String.valueOf(text.get(b)),
+                                                                  b.getX(), b.getY(), b.getWidth(), b.getHeight());
+                        if (boxes.contains(box) == false)
+                        {
+                            boxes.add(box);
+                        }
+                    }
+
+                    for (var wrapper : (List<fi.dy.masa.malilib.gui.wrappers.TextFieldWrapper<?>>) fields.get(gui))
+                    {
+                        var tf = wrapper.textField();
+                        boxes.add(new LayoutProbe.Box(LayoutProbe.Kind.FIELD, "text field", tf.getX(), tf.getY(), tf.getWidth(), tf.getHeight()));
+                    }
+                }
+                catch (ReflectiveOperationException e)
+                {
+                    throw new RuntimeException(e);
+                }
+            }
+
+            int w = mc.getWindow().getGuiScaledWidth();
+            int h = mc.getWindow().getGuiScaledHeight();
+            List<String> list = new ArrayList<>();
+
+            for (String p : LayoutProbe.findProblems(boxes, w, h))
+            {
+                list.add(name + " (" + w + "x" + h + "): " + p);
+            }
+
+            log("Layout %s: %d elements, %d problems", name, boxes.size(), list.size());
+            return list;
+        });
+
+        ctx.takeScreenshot(name);
+        return problems;
+    }
+
     // ------------------------------------------------------------------ manual links, picked up and placed again
 
     /**
@@ -1065,6 +1420,14 @@ public class ShulkerPlannerClientGameTest implements FabricClientGameTest
                 be.setItem(i, stacks.get(i).copy());
             }
         });
+    }
+
+    /**
+     * A left click as GLFW reports it (button 0), what vanilla screens get from the mouse
+     */
+    private static MouseButtonEvent leftClick(double x, double y)
+    {
+        return new MouseButtonEvent(x, y, new MouseButtonInfo(0, 0));
     }
 
     private static MouseButtonEvent click(double x, double y)

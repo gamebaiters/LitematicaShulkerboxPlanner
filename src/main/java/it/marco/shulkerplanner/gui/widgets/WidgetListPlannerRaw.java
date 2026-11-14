@@ -9,6 +9,7 @@ import fi.dy.masa.malilib.gui.LeftRight;
 import fi.dy.masa.malilib.gui.widgets.WidgetListBase;
 import fi.dy.masa.malilib.gui.widgets.WidgetSearchBar;
 
+import it.marco.shulkerplanner.gui.ui.Ui;
 import it.marco.shulkerplanner.data.MaterialRow;
 import it.marco.shulkerplanner.gui.GuiPlannerRaw;
 import it.marco.shulkerplanner.gui.RawRow;
@@ -20,6 +21,7 @@ public class WidgetListPlannerRaw extends WidgetListBase<RawRow, WidgetPlannerRa
     public WidgetListPlannerRaw(int x, int y, int width, int height, GuiPlannerRaw gui)
     {
         super(x, y, width, height, null);
+        Ui.styleScrollbar(this.getScrollbar());
 
         this.gui = gui;
         this.browserEntryHeight = 22;

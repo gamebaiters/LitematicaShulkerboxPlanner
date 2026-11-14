@@ -5,11 +5,12 @@ import java.util.List;
 
 import fi.dy.masa.malilib.config.IConfigBase;
 import fi.dy.masa.malilib.config.options.ConfigBoolean;
+import fi.dy.masa.malilib.config.options.ConfigInteger;
 import fi.dy.masa.malilib.gui.GuiBase;
 import fi.dy.masa.malilib.util.StringUtils;
 
 import it.marco.shulkerplanner.config.Configs;
-import it.marco.shulkerplanner.gui.ui.FlatButton;
+import it.marco.shulkerplanner.gui.ui.PlannerButton;
 import it.marco.shulkerplanner.gui.widgets.WidgetListPlannerSettings;
 import it.marco.shulkerplanner.gui.widgets.WidgetPlannerSettingEntry;
 
@@ -51,6 +52,10 @@ public class GuiPlannerSettings extends GuiPlannerBase<SettingRow, WidgetPlanner
             {
                 rows.add(SettingRow.option(bool));
             }
+            else if (config instanceof ConfigInteger number)
+            {
+                rows.add(SettingRow.number(number));
+            }
         }
 
         return rows;
@@ -59,8 +64,8 @@ public class GuiPlannerSettings extends GuiPlannerBase<SettingRow, WidgetPlanner
     @Override
     protected void createOptionButtons()
     {
-        FlatButton enableAll = new FlatButton(0, 0, -1, StringUtils.translate("shulkerplanner.gui.button.warnings_all_on"),
-                                              FlatButton.Style.SECONDARY,
+        PlannerButton enableAll = new PlannerButton(0, 0, -1, StringUtils.translate("shulkerplanner.gui.button.warnings_all_on"),
+                                              PlannerButton.Style.SECONDARY,
                                               StringUtils.translate("shulkerplanner.gui.button.warnings_all_on.hover"));
         this.addFlowButton(enableAll, (btn, mb) -> {
             Configs.Warnings.setAll(true);
@@ -68,8 +73,8 @@ public class GuiPlannerSettings extends GuiPlannerBase<SettingRow, WidgetPlanner
             this.initGui();
         });
 
-        FlatButton disableAll = new FlatButton(0, 0, -1, StringUtils.translate("shulkerplanner.gui.button.warnings_all_off"),
-                                               FlatButton.Style.SECONDARY,
+        PlannerButton disableAll = new PlannerButton(0, 0, -1, StringUtils.translate("shulkerplanner.gui.button.warnings_all_off"),
+                                               PlannerButton.Style.SECONDARY,
                                                StringUtils.translate("shulkerplanner.gui.button.warnings_all_off.hover"));
         this.addFlowButton(disableAll, (btn, mb) -> {
             Configs.Warnings.setAll(false);
@@ -79,8 +84,8 @@ public class GuiPlannerSettings extends GuiPlannerBase<SettingRow, WidgetPlanner
 
         this.addFlowGap();
 
-        FlatButton hotkeys = new FlatButton(0, 0, -1, StringUtils.translate("shulkerplanner.gui.button.open_hotkeys"),
-                                            FlatButton.Style.GHOST,
+        PlannerButton hotkeys = new PlannerButton(0, 0, -1, StringUtils.translate("shulkerplanner.gui.button.open_hotkeys"),
+                                            PlannerButton.Style.GHOST,
                                             StringUtils.translate("shulkerplanner.gui.button.open_hotkeys.hover"));
         this.addFlowButton(hotkeys, (btn, mb) -> {
             GuiPlannerConfigs gui = new GuiPlannerConfigs();

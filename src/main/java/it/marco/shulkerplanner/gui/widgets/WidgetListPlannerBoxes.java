@@ -12,6 +12,7 @@ import fi.dy.masa.malilib.gui.widgets.WidgetSearchBar;
 import fi.dy.masa.malilib.render.GuiContext;
 import fi.dy.masa.malilib.util.StringUtils;
 
+import it.marco.shulkerplanner.gui.ui.Ui;
 import it.marco.shulkerplanner.gui.GuiPlannerBoxes;
 import it.marco.shulkerplanner.plan.ItemRequirement;
 import it.marco.shulkerplanner.plan.PlannedBox;
@@ -26,6 +27,7 @@ public class WidgetListPlannerBoxes extends WidgetListBase<PlannedBox, WidgetPla
     public WidgetListPlannerBoxes(int x, int y, int width, int height, GuiPlannerBoxes gui)
     {
         super(x, y, width, height, null);
+        Ui.styleScrollbar(this.getScrollbar());
 
         this.gui = gui;
         this.browserEntryHeight = WidgetPlannerBoxEntry.HEIGHT;

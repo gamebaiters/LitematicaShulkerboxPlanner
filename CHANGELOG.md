@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.1.0 - Minecraft 26.3
+
+**Packing assistant panel**
+- Anchored to the shulker box screen: by default right next to it, top aligned and as tall as it, whatever the GUI scale.
+- Drag it by its title bar and resize it from the bottom right corner: the place is saved relative to the shulker box screen, so it's the same every time you open a box (and it follows the screen at other GUI scales). The ↺ button in the title bar puts it back.
+- The list of items scrolls with the mouse wheel or by dragging the scroll bar, so even a box with many item types fits on small screens. Hover an item for the details.
+- See-through background, with the opacity in *Settings* (*Assistant opacity*, 10-100%).
+- A panel moved over the shulker box screen takes the clicks, so nothing behind it is picked up by mistake, and no slot tooltip shows through it.
+- *Follow on HUD* is now the ◉ button in the title bar; the state (Preview / Linked / Done) is next to the progress bar.
+
+**3D buttons, nothing overlapping**
+- Every button of the planner, of the panel and of the HUD editor is now a 3D button: lit top, thick bottom edge, pressed in when it's the current page or a switch that is on. The selected page of the HUD editor no longer looks disabled.
+- Fixed overlapping elements: the progress in the planner header could cover the "Shulker Planner" title (top left) with short schematic names, the *Lock plan* / *Update plan* button was drawn under its banner, the hotbar showed through the summary at the bottom, and in Litematica's material list the *Shulker Planner* button covered the summary text on small screens (it's now in the top row of buttons when there is room).
+- On short screens (GUI scale 4 on 1080p) the informational banner is hidden to leave room for the list; warnings and banners with a button are always shown.
+- Every screen is checked automatically at GUI scales 2, 3 and 4 for overlapping or cut off texts, icons and buttons.
+
 ## 2.0.0 - Minecraft 26.3
 
 **Correct numbers**

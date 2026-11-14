@@ -6,7 +6,7 @@ import java.util.List;
 import fi.dy.masa.malilib.gui.GuiBase;
 import fi.dy.masa.malilib.gui.GuiTextFieldInteger;
 import fi.dy.masa.malilib.gui.Message.MessageType;
-import it.marco.shulkerplanner.gui.ui.FlatButton;
+import it.marco.shulkerplanner.gui.ui.PlannerButton;
 import fi.dy.masa.malilib.util.StringUtils;
 import fi.dy.masa.malilib.util.input.ScanCodes;
 
@@ -43,7 +43,7 @@ public class GuiPlannerMaterials extends GuiPlannerBase<MaterialRow, WidgetPlann
             return;
         }
 
-        FlatButton button = this.createValueButton("shulkerplanner.gui.button.count_mode", project.getCountMode().getDisplayName(), project.getCountMode().getHoverText());
+        PlannerButton button = this.createValueButton("shulkerplanner.gui.button.count_mode", project.getCountMode().getDisplayName(), project.getCountMode().getHoverText());
         this.addFlowButton(button, (btn, mb) -> {
             project.setCountMode(project.getCountMode().cycle(mb == ScanCodes.OFFSET_MOUSE_LEFT));
             this.onPackingOptionsChanged();
@@ -83,7 +83,7 @@ public class GuiPlannerMaterials extends GuiPlannerBase<MaterialRow, WidgetPlann
         });
         tf.setValueWrapper(String.valueOf(project.getMultiplier()));
 
-        button = new FlatButton(0, 0, -1, (showMoreOptions ? "▴ " : "▾ ") + StringUtils.translate("shulkerplanner.gui.button.more_options"), FlatButton.Style.GHOST);
+        button = new PlannerButton(0, 0, -1, (showMoreOptions ? "▴ " : "▾ ") + StringUtils.translate("shulkerplanner.gui.button.more_options"), PlannerButton.Style.GHOST);
         this.addFlowButton(button, (btn, mb) -> {
             showMoreOptions = ! showMoreOptions;
             this.initGui();

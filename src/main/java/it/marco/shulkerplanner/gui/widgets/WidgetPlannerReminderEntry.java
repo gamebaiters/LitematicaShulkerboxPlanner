@@ -7,7 +7,6 @@ import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.world.item.ItemStack;
 
 import fi.dy.masa.malilib.gui.GuiBase;
-import fi.dy.masa.malilib.gui.button.ButtonGeneric;
 import fi.dy.masa.malilib.gui.widgets.WidgetListEntryBase;
 import fi.dy.masa.malilib.render.GuiContext;
 import fi.dy.masa.malilib.render.RenderUtils;
@@ -16,6 +15,9 @@ import fi.dy.masa.malilib.util.StringUtils;
 import it.marco.shulkerplanner.data.MaterialRow;
 import it.marco.shulkerplanner.data.PlannerProject;
 import it.marco.shulkerplanner.data.Reminder;
+import it.marco.shulkerplanner.gui.ui.PlannerButton;
+import it.marco.shulkerplanner.gui.ui.Theme;
+import it.marco.shulkerplanner.gui.ui.Ui;
 import it.marco.shulkerplanner.gui.GuiPlannerReminders;
 import it.marco.shulkerplanner.util.Format;
 
@@ -45,8 +47,10 @@ public class WidgetPlannerReminderEntry extends WidgetListEntryBase<Reminder>
         }
 
         // Done toggle on the left
-        String check = entry.isDone() ? GuiBase.TXT_GREEN + "✔" : GuiBase.TXT_GRAY + "○";
-        ButtonGeneric toggle = new ButtonGeneric(x + 2, y + 1, 20, 20, check, StringUtils.translate("shulkerplanner.gui.button.reminder_toggle.hover"));
+        int by = y + (height - PlannerButton.HEIGHT) / 2;
+        PlannerButton toggle = new PlannerButton(x + 2, by, 20, entry.isDone() ? "✔" : "○", PlannerButton.Style.SECONDARY,
+                                                 StringUtils.translate("shulkerplanner.gui.button.reminder_toggle.hover"));
+        toggle.setTextColor(entry.isDone() ? Theme.SUCCESS : Theme.TEXT_DIM);
         this.addButton(toggle, (btn, mb) -> {
             entry.setDone(! entry.isDone());
             gui.onProjectChanged();
@@ -65,7 +69,7 @@ public class WidgetPlannerReminderEntry extends WidgetListEntryBase<Reminder>
 
         // Buttons on the right, placed right to left
         int xRight = x + width - 2;
-        ButtonGeneric delete = new ButtonGeneric(xRight - 20, y + 1, 20, 20, GuiBase.TXT_RED + "✖",
+        PlannerButton delete = new PlannerButton(xRight - 20, by, 20, "✖", PlannerButton.Style.DANGER,
                                                  StringUtils.translate("shulkerplanner.gui.button.reminder_delete.hover"));
         this.addButton(delete, (btn, mb) -> {
             project.getReminders().remove(entry);
@@ -73,17 +77,17 @@ public class WidgetPlannerReminderEntry extends WidgetListEntryBase<Reminder>
         });
         xRight = delete.getX() - 2;
 
-        ButtonGeneric edit = new ButtonGeneric(xRight - 20, y + 1, 20, 20, "✎",
+        PlannerButton edit = new PlannerButton(xRight - 20, by, 20, "✎", PlannerButton.Style.SECONDARY,
                                                StringUtils.translate("shulkerplanner.gui.button.reminder_edit.hover"));
         this.addButton(edit, (btn, mb) -> gui.startEditing(entry));
         xRight = edit.getX() - 2;
 
-        ButtonGeneric down = new ButtonGeneric(xRight - 16, y + 1, 16, 20, "▼");
+        PlannerButton down = new PlannerButton(xRight - 18, by, 18, "▼", PlannerButton.Style.GHOST);
         down.setEnabled(this.canMove(project, entry, 1));
         this.addButton(down, (btn, mb) -> this.move(project, entry, 1));
-        xRight = down.getX() - 1;
+        xRight = down.getX() - 2;
 
-        ButtonGeneric up = new ButtonGeneric(xRight - 16, y + 1, 16, 20, "▲");
+        PlannerButton up = new PlannerButton(xRight - 18, by, 18, "▲", PlannerButton.Style.GHOST);
         up.setEnabled(this.canMove(project, entry, -1));
         this.addButton(up, (btn, mb) -> this.move(project, entry, -1));
         xRight = up.getX() - 4;
@@ -128,27 +132,27 @@ public class WidgetPlannerReminderEntry extends WidgetListEntryBase<Reminder>
             return;
         }
 
-        int bg = reminder.isDone() ? 0xA0102010 : (this.isOdd ? 0xA0101010 : 0xA0303030);
+        int bg = reminder.isDone() ? Theme.SUCCESS_BG : (this.isOdd ? Theme.withAlpha(Theme.SURFACE_2, 0x90) : 0);
 
         if (this.list.getGui().isEditing(reminder))
         {
-            bg = 0xA0404010;
+            bg = Theme.WARN_BG;
         }
         else if (this.isMouseOver(mouseX, mouseY))
         {
-            bg = 0xA0505050;
+            bg = Theme.SURFACE_3;
         }
 
-        RenderUtils.drawRect(ctx, this.x, this.y, this.width, this.height, bg);
+        Ui.rect(ctx, this.x, this.y, this.width, this.height, bg);
 
         if (this.icon != null)
         {
-            ctx.renderItem(this.icon, this.textX - 19, this.y + 3);
+            Ui.item(ctx, this.icon, this.textX - 19, this.y + (this.height - 16) / 2);
         }
 
-        String text = Format.trim(reminder.getText(), Math.max(20, this.textMaxWidth));
-        String color = reminder.isDone() ? GuiBase.TXT_DARK_GRAY + GuiBase.TXT_STRIKETHROUGH : GuiBase.TXT_WHITE;
-        this.drawString(ctx, this.textX, this.y + 7, 0xFFFFFFFF, color + text);
+        String text = Ui.trim(reminder.getText(), Math.max(20, this.textMaxWidth));
+        int ty = this.y + (this.height - 8) / 2;
+        Ui.text(ctx, reminder.isDone() ? GuiBase.TXT_STRIKETHROUGH + text : text, this.textX, ty, reminder.isDone() ? Theme.TEXT_MUTED : Theme.TEXT);
 
         super.render(ctx, mouseX, mouseY, selected);
     }

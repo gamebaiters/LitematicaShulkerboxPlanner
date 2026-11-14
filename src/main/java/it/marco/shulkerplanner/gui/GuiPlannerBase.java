@@ -24,9 +24,10 @@ import fi.dy.masa.malilib.util.StringUtils;
 import it.marco.shulkerplanner.config.Configs;
 import it.marco.shulkerplanner.data.PlannerProject;
 import it.marco.shulkerplanner.data.PlannerSession;
-import it.marco.shulkerplanner.gui.ui.FlatButton;
+import it.marco.shulkerplanner.gui.ui.PlannerButton;
 import it.marco.shulkerplanner.gui.ui.Theme;
 import it.marco.shulkerplanner.gui.ui.Ui;
+import it.marco.shulkerplanner.gui.ui.UiLabel;
 import it.marco.shulkerplanner.plan.ShulkerPlan;
 
 /**
@@ -59,6 +60,8 @@ public abstract class GuiPlannerBase<TYPE, WIDGET extends WidgetListEntryBase<TY
     private int contentX;
     private int sidebarWidth;
     private int bannerY = -1;
+    /** The left edge of the buttons on the right of the header: the title and the progress must end before it */
+    private int headerButtonsX;
     private int bannerHeight;
     @Nullable private Banner banner;
 
@@ -140,6 +143,12 @@ public abstract class GuiPlannerBase<TYPE, WIDGET extends WidgetListEntryBase<TY
         int y = this.flowY + ROW_HEIGHT;
         this.banner = this.createBanner();
 
+        // On a short screen (GUI scale 4 on 1080p) the list needs the room more than a banner that only informs
+        if (this.banner != null && this.banner.action() == null && this.banner.color() != Theme.WARN && this.getScreenHeight() < 320)
+        {
+            this.banner = null;
+        }
+
         if (this.banner != null)
         {
             this.bannerY = y;
@@ -149,7 +158,7 @@ public abstract class GuiPlannerBase<TYPE, WIDGET extends WidgetListEntryBase<TY
             if (this.banner.action() != null && this.banner.onAction() != null)
             {
                 Runnable action = this.banner.onAction();
-                FlatButton button = new FlatButton(0, 0, -1, this.banner.action(), FlatButton.Style.PRIMARY);
+                PlannerButton button = new PlannerButton(0, 0, -1, this.banner.action(), PlannerButton.Style.PRIMARY);
                 button.setPosition(this.contentX + this.getContentWidth() - button.getWidth() - 1, this.bannerY);
                 this.addButton(button, (btn, mb) -> action.run());
             }
@@ -216,13 +225,13 @@ public abstract class GuiPlannerBase<TYPE, WIDGET extends WidgetListEntryBase<TY
         int y = 8;
         int xRight = this.getScreenWidth() - MARGIN;
 
-        FlatButton close = new FlatButton(0, y, 18, "✕", FlatButton.Style.GHOST, StringUtils.translate("shulkerplanner.gui.button.close"));
+        PlannerButton close = new PlannerButton(0, y, 18, "✕", PlannerButton.Style.GHOST, StringUtils.translate("shulkerplanner.gui.button.close"));
         close.setPosition(xRight - close.getWidth(), y);
         this.addButton(close, (btn, mb) -> this.closeGui(true));
         xRight = close.getX() - 4;
 
         boolean hud = Configs.Generic.HUD_ENABLED.getBooleanValue();
-        FlatButton hudButton = FlatButton.toggle(StringUtils.translate("shulkerplanner.gui.button.hud_short"), hud,
+        PlannerButton hudButton = PlannerButton.toggle(StringUtils.translate("shulkerplanner.gui.button.hud_short"), hud,
                                                  StringUtils.translate("shulkerplanner.gui.button.hud.hover"));
         hudButton.setPosition(xRight - hudButton.getWidth(), y);
         this.addButton(hudButton, (btn, mb) -> {
@@ -233,11 +242,14 @@ public abstract class GuiPlannerBase<TYPE, WIDGET extends WidgetListEntryBase<TY
 
         if (this.isCompact() == false)
         {
-            FlatButton editHud = new FlatButton(0, y, -1, StringUtils.translate("shulkerplanner.gui.button.edit_hud"), FlatButton.Style.SECONDARY,
+            PlannerButton editHud = new PlannerButton(0, y, -1, StringUtils.translate("shulkerplanner.gui.button.edit_hud"), PlannerButton.Style.SECONDARY,
                                                 StringUtils.translate("shulkerplanner.gui.button.edit_hud.hover"));
             editHud.setPosition(xRight - editHud.getWidth(), y);
             this.addButton(editHud, (btn, mb) -> GuiBase.openGui(new GuiHudEditor(this)));
+            xRight = editHud.getX() - 4;
         }
+
+        this.headerButtonsX = xRight + 4;
     }
 
     private void createSidebar()
@@ -261,7 +273,7 @@ public abstract class GuiPlannerBase<TYPE, WIDGET extends WidgetListEntryBase<TY
                 }
             }
 
-            FlatButton button = new FlatButton(x, y, w, label, FlatButton.Style.TAB, tab.getDisplayName(), tab.getDescription());
+            PlannerButton button = new PlannerButton(x, y, w, label, PlannerButton.Style.TAB, tab.getDisplayName(), tab.getDescription());
             button.setIcon(tab.getIcon());
             button.setWidth(w);
             button.setActive(tab == this.tab);
@@ -271,7 +283,7 @@ public abstract class GuiPlannerBase<TYPE, WIDGET extends WidgetListEntryBase<TY
                     GuiBase.openGui(PlannerGuis.create(tab, this.getParent()));
                 }
             });
-            y += FlatButton.HEIGHT + 4;
+            y += PlannerButton.HEIGHT + 4;
         }
 
         if (compact)
@@ -280,12 +292,12 @@ public abstract class GuiPlannerBase<TYPE, WIDGET extends WidgetListEntryBase<TY
         }
 
         // Source of the materials, at the bottom of the side bar
-        int by = this.getScreenHeight() - BOTTOM_HEIGHT - 2 * (FlatButton.HEIGHT + 4) + 4;
+        int by = this.getScreenHeight() - BOTTOM_HEIGHT - 2 * (PlannerButton.HEIGHT + 4) + 4;
         MaterialListBase materialList = this.session.getMaterialList();
 
         if (materialList != null && (this.getParent() instanceof GuiMaterialList) == false)
         {
-            FlatButton button = new FlatButton(x, by, w, StringUtils.translate("shulkerplanner.gui.button.open_material_list"), FlatButton.Style.GHOST);
+            PlannerButton button = new PlannerButton(x, by, w, StringUtils.translate("shulkerplanner.gui.button.open_material_list"), PlannerButton.Style.GHOST);
             button.setIcon(new ItemStack(Items.PAPER));
             button.setWidth(w);
             this.addButton(button, (btn, mouseButton) -> {
@@ -297,8 +309,8 @@ public abstract class GuiPlannerBase<TYPE, WIDGET extends WidgetListEntryBase<TY
 
         if (materialList != null)
         {
-            FlatButton button = new FlatButton(x, by + FlatButton.HEIGHT + 4, w, StringUtils.translate("shulkerplanner.gui.button.refresh_materials"),
-                                               FlatButton.Style.GHOST, StringUtils.translate("shulkerplanner.gui.button.refresh_materials.hover"));
+            PlannerButton button = new PlannerButton(x, by + PlannerButton.HEIGHT + 4, w, StringUtils.translate("shulkerplanner.gui.button.refresh_materials"),
+                                               PlannerButton.Style.GHOST, StringUtils.translate("shulkerplanner.gui.button.refresh_materials.hover"));
             button.setIcon(new ItemStack(Items.COMPASS));
             button.setWidth(w);
             this.addButton(button, (btn, mouseButton) -> {
@@ -380,9 +392,9 @@ public abstract class GuiPlannerBase<TYPE, WIDGET extends WidgetListEntryBase<TY
 
     protected void addFlowLabel(String text)
     {
-        int width = this.getStringWidth(text) + 4;
+        int width = Ui.width(text) + 4;
         this.advanceFlow(width);
-        this.addLabel(this.flowX, this.flowY + 5, width, 10, Theme.TEXT_DIM, text);
+        this.addWidget(new UiLabel(this.flowX, this.flowY + 5, text, Theme.TEXT_DIM));
         this.flowX += width;
     }
 
@@ -407,23 +419,23 @@ public abstract class GuiPlannerBase<TYPE, WIDGET extends WidgetListEntryBase<TY
     /**
      * Creates a button showing "Label: Value", cycling through values on left/right click
      */
-    protected FlatButton createValueButton(String labelKey, String value, @Nullable String hover)
+    protected PlannerButton createValueButton(String labelKey, String value, @Nullable String hover)
     {
         String label = StringUtils.translate(labelKey, value) + " ▾";
-        return hover != null ? new FlatButton(0, 0, -1, label, FlatButton.Style.SECONDARY, hover, StringUtils.translate("shulkerplanner.gui.hover.cycle"))
-                             : new FlatButton(0, 0, -1, label, FlatButton.Style.SECONDARY, StringUtils.translate("shulkerplanner.gui.hover.cycle"));
+        return hover != null ? new PlannerButton(0, 0, -1, label, PlannerButton.Style.SECONDARY, hover, StringUtils.translate("shulkerplanner.gui.hover.cycle"))
+                             : new PlannerButton(0, 0, -1, label, PlannerButton.Style.SECONDARY, StringUtils.translate("shulkerplanner.gui.hover.cycle"));
     }
 
-    protected FlatButton createToggle(String labelKey, boolean value, @Nullable String hover)
+    protected PlannerButton createToggle(String labelKey, boolean value, @Nullable String hover)
     {
         String label = StringUtils.translate(labelKey);
-        return hover != null ? FlatButton.toggle(label, value, hover) : FlatButton.toggle(label, value);
+        return hover != null ? PlannerButton.toggle(label, value, hover) : PlannerButton.toggle(label, value);
     }
 
-    protected FlatButton createAction(String labelKey, @Nullable String hover)
+    protected PlannerButton createAction(String labelKey, @Nullable String hover)
     {
         String label = StringUtils.translate(labelKey);
-        return hover != null ? new FlatButton(0, 0, -1, label, FlatButton.Style.SECONDARY, hover) : new FlatButton(0, 0, -1, label, FlatButton.Style.SECONDARY);
+        return hover != null ? new PlannerButton(0, 0, -1, label, PlannerButton.Style.SECONDARY, hover) : new PlannerButton(0, 0, -1, label, PlannerButton.Style.SECONDARY);
     }
 
     @Override
@@ -432,80 +444,109 @@ public abstract class GuiPlannerBase<TYPE, WIDGET extends WidgetListEntryBase<TY
         int w = this.getScreenWidth();
         int h = this.getScreenHeight();
 
+        // The header, the side bar and the summary bar are opaque, so the hotbar doesn't show through them
         Ui.rect(ctx, 0, 0, w, h, Theme.SCRIM);
-        Ui.rect(ctx, 0, 0, w, HEADER_HEIGHT, Theme.SURFACE);
+        Ui.gradient(ctx, 0, 0, w, HEADER_HEIGHT, Theme.withAlpha(Theme.SURFACE_2, 0xFF), Theme.withAlpha(Theme.SURFACE, 0xFF));
         Ui.hline(ctx, 0, HEADER_HEIGHT, w, Theme.BORDER);
-        Ui.rect(ctx, 0, HEADER_HEIGHT + 1, this.sidebarWidth, h - HEADER_HEIGHT - 1, Theme.withAlpha(Theme.SURFACE, 0xC0));
+        Ui.rect(ctx, 0, HEADER_HEIGHT + 1, this.sidebarWidth, h - HEADER_HEIGHT - 1, Theme.withAlpha(Theme.SURFACE, 0xFF));
         Ui.vline(ctx, this.sidebarWidth, HEADER_HEIGHT + 1, h - HEADER_HEIGHT - 1, Theme.BORDER);
+        int bottom = h - BOTTOM_HEIGHT;
+        Ui.rect(ctx, this.sidebarWidth + 1, bottom, w - this.sidebarWidth - 1, BOTTOM_HEIGHT, Theme.withAlpha(Theme.SURFACE, 0xFF));
+        Ui.hline(ctx, this.sidebarWidth + 1, bottom, w - this.sidebarWidth - 1, Theme.BORDER);
+
+        // The banner is drawn here, below its action button
+        if (this.banner != null && this.bannerY >= 0)
+        {
+            int x = this.contentX;
+            int bw = this.getContentWidth();
+            Ui.panel(ctx, x, this.bannerY, bw, this.bannerHeight, this.banner.background());
+            Ui.rect(ctx, x, this.bannerY + 2, 2, this.bannerHeight - 4, this.banner.color());
+            int actionWidth = this.banner.action() != null ? PlannerButton.autoWidth(this.banner.action(), false, null) + 8 : 0;
+            Ui.text(ctx, Ui.trim(this.banner.text(), bw - 14 - actionWidth), x + 8, this.bannerY + 5, this.banner.color());
+        }
     }
 
     @Override
     protected void drawTitle(GuiContext ctx, int mouseX, int mouseY, float partialTicks)
     {
+        // Left: icon, brand and schematic name. Then, if there is room before the buttons on the right,
+        // the overall progress (the most important status of the whole screen) and the plan state.
         PlannerProject project = this.getProject();
         int x = MARGIN;
+        int limit = this.headerButtonsX - 8;
         ItemStack icon = new ItemStack(project != null ? project.getShulkerItem(1) : Items.SHULKER_BOX);
         Ui.item(ctx, icon, x, 9);
         x += 22;
 
-        Ui.text(ctx, StringUtils.translate("shulkerplanner.gui.brand"), x, 7, Theme.ACCENT_HOVER);
+        String brand = StringUtils.translate("shulkerplanner.gui.brand");
         String name = project != null ? project.getSchematicName() : "-";
-        int maxName = Math.max(60, this.getScreenWidth() / 3);
-        Ui.textShadow(ctx, Ui.trim(name, maxName), x, 19, Theme.TEXT);
+        int maxName = Math.max(40, Math.min(Math.max(Ui.width(brand), this.getScreenWidth() / 3), limit - x));
+        name = Ui.trim(name, maxName);
+        Ui.text(ctx, Ui.trim(brand, limit - x), x, 7, Theme.ACCENT_HOVER);
+        Ui.textShadow(ctx, name, x, 19, Theme.TEXT);
+        int leftEnd = x + Math.max(Math.min(Ui.width(brand), limit - x), Ui.width(name));
 
-        // Overall progress, the most important status of the whole screen
-        if (project != null && this.isCompact() == false)
+        if (project == null)
         {
-            ShulkerPlan plan = this.session.getPlan();
-            int ready = this.session.getReadyBoxCount();
-            int count = plan.getBoxCount();
-            int px = x + Math.min(Ui.width(name), maxName) + 20;
-            int pw = 120;
-
-            if (px + pw < this.getScreenWidth() - 200 && count > 0)
-            {
-                String label = StringUtils.translate("shulkerplanner.gui.header.progress", ready, count);
-                Ui.text(ctx, label, px, 8, ready >= count ? Theme.SUCCESS : Theme.TEXT_DIM);
-                Ui.progress(ctx, px, 20, pw, 6, (double) ready / count, ready >= count ? Theme.SUCCESS : Theme.ACCENT, Theme.SURFACE_3);
-
-                int cx = px + pw + 10;
-                if (this.session.isPlanLocked())
-                {
-                    Ui.lockChip(ctx, StringUtils.translate("shulkerplanner.gui.chip.locked"), cx, 17, Theme.ACCENT_HOVER, Theme.ACCENT_BG);
-                }
-                else
-                {
-                    Ui.chip(ctx, StringUtils.translate("shulkerplanner.gui.chip.draft"), cx, 17, Theme.TEXT_DIM, Theme.SURFACE_3);
-                }
-
-                if (project.getPackRawMaterials())
-                {
-                    int cw = Ui.chipWidth(StringUtils.translate(this.session.isPlanLocked() ? "shulkerplanner.gui.chip.locked" : "shulkerplanner.gui.chip.draft")) + (this.session.isPlanLocked() ? 10 : 0);
-                    Ui.chip(ctx, StringUtils.translate("shulkerplanner.gui.chip.raw"), cx + cw + 4, 17, Theme.WARN, Theme.WARN_BG);
-                }
-            }
+            return;
         }
 
+        ShulkerPlan plan = this.session.getPlan();
+        int count = plan.getBoxCount();
+
+        if (count <= 0)
+        {
+            return;
+        }
+
+        int ready = this.session.getReadyBoxCount();
+        boolean locked = this.session.isPlanLocked();
+        String label = StringUtils.translate("shulkerplanner.gui.header.progress", ready, count);
+        String state = StringUtils.translate(locked ? "shulkerplanner.gui.chip.locked" : "shulkerplanner.gui.chip.draft");
+        String raw = project.getPackRawMaterials() ? StringUtils.translate("shulkerplanner.gui.chip.raw") : null;
+        int stateWidth = locked ? Ui.width(state) + 18 : Ui.chipWidth(state);
+        int chipsWidth = 6 + stateWidth + (raw != null ? 4 + Ui.chipWidth(raw) : 0);
+        int px = leftEnd + 16;
+        int room = limit - px;
+        boolean chips = room >= Ui.width(label) + chipsWidth;
+
+        if (room < Math.max(60, Ui.width(label)))
+        {
+            return;
+        }
+
+        int pw = Math.min(120, room);
+        int done = ready >= count ? Theme.SUCCESS : Theme.TEXT_DIM;
+        Ui.text(ctx, label, px, 8, done);
+        Ui.progress(ctx, px, 20, pw, 6, (double) ready / count, ready >= count ? Theme.SUCCESS : Theme.ACCENT, Theme.SURFACE_3);
+
+        if (chips)
+        {
+            int cx = px + Ui.width(label) + 6;
+
+            if (locked)
+            {
+                cx += Ui.lockChip(ctx, state, cx, 6, Theme.ACCENT_HOVER, Theme.ACCENT_BG) + 4;
+            }
+            else
+            {
+                cx += Ui.chip(ctx, state, cx, 6, Theme.TEXT_DIM, Theme.SURFACE_3) + 4;
+            }
+
+            if (raw != null)
+            {
+                Ui.chip(ctx, raw, cx, 6, Theme.WARN, Theme.WARN_BG);
+            }
+        }
     }
 
     @Override
     public void drawContents(GuiContext ctx, int mouseX, int mouseY, float partialTicks)
     {
-        if (this.banner != null && this.bannerY >= 0)
-        {
-            int x = this.contentX;
-            int w = this.getContentWidth();
-            Ui.panel(ctx, x, this.bannerY, w, this.bannerHeight, this.banner.background());
-            Ui.rect(ctx, x, this.bannerY + 2, 2, this.bannerHeight - 4, this.banner.color());
-            int actionWidth = this.banner.action() != null ? FlatButton.autoWidth(this.banner.action(), false, null) + 8 : 0;
-            Ui.text(ctx, Ui.trim(this.banner.text(), w - 14 - actionWidth), x + 8, this.bannerY + 5, this.banner.color());
-        }
-
         super.drawContents(ctx, mouseX, mouseY, partialTicks);
 
         List<String> lines = this.getSummaryLines();
         int y = this.getScreenHeight() - BOTTOM_HEIGHT + 4;
-        Ui.hline(ctx, this.contentX, y - 4, this.getContentWidth(), Theme.BORDER);
 
         if (lines.size() == 1)
         {

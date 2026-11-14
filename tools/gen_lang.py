@@ -380,6 +380,13 @@ t("assistant.link", "Collega a #%s", "Link to #%s")
 t("assistant.unlink", "Scollega", "Unlink")
 t("assistant.mark_done", "Segna pronta", "Mark done")
 t("assistant.undo_done", "Riapri fase", "Reopen")
+t("assistant.hover.move", "Trascina per spostare il pannello", "Drag to move the panel")
+t("assistant.hover.reset", "Rimetti il pannello accanto alla shulker, con la dimensione automatica", "Put the panel back next to the shulker box, with the automatic size")
+t("assistant.hover.hud_on", "Questa fase è sull'HUD: clicca per smettere di seguirla", "This phase is on the HUD: click to stop following it")
+t("assistant.hover.hud_off", "Mostra questa fase sull'HUD", "Show this phase on the HUD")
+t("assistant.hover.resize", "Trascina per ridimensionare", "Drag to resize")
+t("assistant.hover.in_box", "Nella shulker: %s / %s (%s)", "In the box: %s / %s (%s)")
+t("assistant.hover.wrong", "Non fa parte di questa fase: %s da togliere", "Not part of this box: %s to remove")
 t("assistant.already_linked", "Questa fase ha già un'altra shulker", "Phase already linked to another box")
 
 t("message.box_complete", "Shulker #%s completata!", "Shulker box #%s complete!")
@@ -397,6 +404,7 @@ configs = {
         ("hudFollowSelectedPlacement", "HUD segue il placement", "HUD follows placement", "Quando selezioni un placement di Litematica che ha già un progetto,\nl'HUD passa a quella schematica", "When you select a Litematica placement that already has a project,\nthe HUD switches to that schematic"),
         ("hudFollowOpenedBox", "HUD segue shulker aperta", "HUD follows opened box", "Quando apri una shulker collegata al piano,\nl'HUD mostra automaticamente quella fase", "When you open a shulker box linked to the plan,\nthe HUD automatically shows that box"),
         ("packingAssistant", "Assistente riempimento", "Packing assistant", "Quando apri una shulker box mostra a lato cosa\ndeve contenere secondo il piano", "When opening a shulker box, shows next to it\nwhat it should contain according to the plan"),
+        ("packingAssistantOpacity", "Opacità assistente", "Assistant opacity", "Opacità dello sfondo del pannello accanto alle shulker (10-100%).\nIl pannello si sposta trascinando la barra in alto,\nsi ridimensiona dall'angolo in basso a destra.", "Background opacity of the panel next to shulker boxes (10-100%).\nMove the panel by dragging its title bar,\nresize it from the bottom right corner."),
         ("autoLinkOpenedBoxes", "Collega shulker in automatico", "Auto-link opened boxes", "Sconsigliato: collega automaticamente una shulker appena la apri.\nDisattivato di default per collegare le shulker solo a mano.", "Not recommended: automatically links a shulker box on open.\nOff by default so you link boxes manually."),
         ("autoMarkFilledBoxes", "Segna shulker automaticamente", "Auto mark filled boxes", "Segna come pronte le shulker collegate quando contengono\nesattamente gli item previsti dal piano", "Marks linked boxes as ready when they contain\nthe exact items required by the plan"),
         ("autoDetectInventoryBoxes", "Rileva shulker in inventario", "Detect boxes in inventory", "Conta gli item dentro le shulker e i bundle\nche porti nell'inventario", "Counts items inside shulker boxes and bundles\nin your inventory"),

@@ -38,13 +38,23 @@ public class Configs implements IConfigHandler
         public static final ConfigBoolean RESPECT_LITEMATICA_IGNORED = new ConfigBoolean("respectLitematicaIgnored", true).apply(GENERIC_KEY);
         public static final ConfigBoolean ADD_BUTTON_MATERIAL_LIST  = new ConfigBoolean("addButtonToMaterialList",  true).apply(GENERIC_KEY);
         public static final ConfigBoolean ADD_BUTTON_MAIN_MENU      = new ConfigBoolean("addButtonToMainMenu",      true).apply(GENERIC_KEY);
+        public static final ConfigInteger ASSISTANT_OPACITY         = new ConfigInteger("packingAssistantOpacity",  60, 10, 100).apply(GENERIC_KEY);
         public static final ConfigString  LAST_PROJECT              = new ConfigString("lastProject",               "").apply(GENERIC_KEY);
+
+        // Position and size of the packing assistant panel, anchored to the container screen:
+        // side 1 = right of it, 2 = left of it, 0 = not moved yet. Width/height 0 = automatic.
+        public static final ConfigInteger ASSISTANT_SIDE            = new ConfigInteger("assistantSide",            0, 0, 2);
+        public static final ConfigInteger ASSISTANT_GAP             = new ConfigInteger("assistantGap",             4, -8000, 8000);
+        public static final ConfigInteger ASSISTANT_OFFSET_Y        = new ConfigInteger("assistantOffsetY",         0, -8000, 8000);
+        public static final ConfigInteger ASSISTANT_WIDTH           = new ConfigInteger("assistantWidth",           0, 0, 8000);
+        public static final ConfigInteger ASSISTANT_HEIGHT          = new ConfigInteger("assistantHeight",          0, 0, 8000);
 
         public static final ImmutableList<IConfigBase> OPTIONS = ImmutableList.of(
                 HUD_ENABLED,
                 HUD_FOLLOW_PLACEMENT,
                 HUD_FOLLOW_OPENED_BOX,
                 PACKING_ASSISTANT,
+                ASSISTANT_OPACITY,
                 AUTO_LINK_OPENED_BOXES,
                 AUTO_MARK_BOXES,
                 AUTO_DETECT_INVENTORY_BOXES,
@@ -54,7 +64,8 @@ public class Configs implements IConfigHandler
         );
 
         // Internal values, saved but not shown in the config GUI
-        public static final List<IConfigBase> INTERNAL = ImmutableList.of(LAST_PROJECT);
+        public static final List<IConfigBase> INTERNAL = ImmutableList.of(LAST_PROJECT, ASSISTANT_SIDE, ASSISTANT_GAP, ASSISTANT_OFFSET_Y,
+                                                                          ASSISTANT_WIDTH, ASSISTANT_HEIGHT);
     }
 
     /**

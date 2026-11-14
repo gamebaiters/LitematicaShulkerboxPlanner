@@ -7,6 +7,7 @@ import javax.annotation.Nullable;
 
 import fi.dy.masa.malilib.gui.widgets.WidgetListBase;
 
+import it.marco.shulkerplanner.gui.ui.Ui;
 import it.marco.shulkerplanner.data.PlannerProject;
 import it.marco.shulkerplanner.data.Reminder;
 import it.marco.shulkerplanner.gui.GuiPlannerReminders;
@@ -18,6 +19,7 @@ public class WidgetListPlannerReminders extends WidgetListBase<Reminder, WidgetP
     public WidgetListPlannerReminders(int x, int y, int width, int height, GuiPlannerReminders gui)
     {
         super(x, y, width, height, null);
+        Ui.styleScrollbar(this.getScrollbar());
 
         this.gui = gui;
         this.browserEntryHeight = 22;

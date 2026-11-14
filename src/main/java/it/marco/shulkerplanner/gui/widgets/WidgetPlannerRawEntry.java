@@ -17,7 +17,7 @@ import it.marco.shulkerplanner.data.PlannerProject;
 import it.marco.shulkerplanner.data.PlannerSession;
 import it.marco.shulkerplanner.gui.GuiPlannerRaw;
 import it.marco.shulkerplanner.gui.RawRow;
-import it.marco.shulkerplanner.gui.ui.FlatButton;
+import it.marco.shulkerplanner.gui.ui.PlannerButton;
 import it.marco.shulkerplanner.gui.ui.Theme;
 import it.marco.shulkerplanner.gui.ui.Ui;
 import it.marco.shulkerplanner.recipe.RawMaterialCalculator;
@@ -59,7 +59,7 @@ public class WidgetPlannerRawEntry extends WidgetListEntryBase<RawRow>
             // Only items kept by the player can be broken down again
             if (project.getRawBaseItems().contains(id))
             {
-                FlatButton button = new FlatButton(0, y + 2, -1, StringUtils.translate("shulkerplanner.gui.button.break_down"), FlatButton.Style.SECONDARY,
+                PlannerButton button = new PlannerButton(0, y + 2, -1, StringUtils.translate("shulkerplanner.gui.button.break_down"), PlannerButton.Style.SECONDARY,
                                                    StringUtils.translate("shulkerplanner.gui.button.break_down.hover"));
                 button.setPosition(xRight - button.getWidth(), y + 2);
                 this.addButton(button, (btn, mb) -> {
@@ -71,7 +71,7 @@ public class WidgetPlannerRawEntry extends WidgetListEntryBase<RawRow>
         }
         else if (entry.kind() == RawRow.Kind.STEP)
         {
-            FlatButton keep = new FlatButton(0, y + 3, -1, StringUtils.translate("shulkerplanner.gui.button.keep_item"), FlatButton.Style.GHOST,
+            PlannerButton keep = new PlannerButton(0, y + 3, -1, StringUtils.translate("shulkerplanner.gui.button.keep_item"), PlannerButton.Style.GHOST,
                                              StringUtils.translate("shulkerplanner.gui.button.keep_item.hover"));
             keep.setPosition(xRight - keep.getWidth(), y + 3);
             this.addButton(keep, (btn, mb) -> {
@@ -87,7 +87,7 @@ public class WidgetPlannerRawEntry extends WidgetListEntryBase<RawRow>
             {
                 int index = Math.max(0, recipes.indexOf(entry.step().recipe()));
                 String label = StringUtils.translate("shulkerplanner.gui.button.recipe", index + 1, recipes.size()) + " ▸";
-                FlatButton cycle = new FlatButton(0, y + 3, -1, label, FlatButton.Style.SECONDARY,
+                PlannerButton cycle = new PlannerButton(0, y + 3, -1, label, PlannerButton.Style.SECONDARY,
                                                   StringUtils.translate("shulkerplanner.gui.button.recipe.hover"));
                 cycle.setPosition(xRight - cycle.getWidth(), y + 3);
                 this.addButton(cycle, (btn, mb) -> {

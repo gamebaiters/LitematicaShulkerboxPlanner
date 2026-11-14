@@ -10,6 +10,7 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
+import it.marco.shulkerplanner.gui.ui.Button3D;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
@@ -100,12 +101,12 @@ public class GuiHudEditor extends Screen
 
         for (Page p : Page.values())
         {
-            Button tab = Button.builder(Component.literal(tr("page." + p.name().toLowerCase())), b -> {
+            Button3D tab = Button3D.builder3d(Component.literal(tr("page." + p.name().toLowerCase())), b -> {
                 page = p;
                 this.panelScroll = 0;
                 this.rebuildWidgets();
             }).bounds(x + 2 + p.ordinal() * (tabWidth + 2), 6, tabWidth, 20).build();
-            tab.active = page != p;
+            tab.setSelected(page == p);
             this.addRenderableWidget(tab);
         }
 
@@ -133,7 +134,7 @@ public class GuiHudEditor extends Screen
             y += ROW;
         }
 
-        this.addRenderableWidget(Button.builder(Component.literal(tr("done")), b -> this.onClose())
+        this.addRenderableWidget(Button3D.builder3d(Component.literal(tr("done")), b -> this.onClose())
                                        .bounds(x + 4, this.height - 26, PANEL_WIDTH - 8, 20).build());
     }
 
@@ -157,7 +158,7 @@ public class GuiHudEditor extends Screen
             box.setHint(Component.literal(schematic));
             box.setResponder(s -> this.style().setTitle(s));
             this.addRenderableWidget(box);
-            this.addRenderableWidget(Button.builder(Component.literal("↺"), b -> {
+            this.addRenderableWidget(Button3D.builder3d(Component.literal("↺"), b -> {
                 this.style().setTitle("");
                 this.rebuildWidgets();
             }).bounds(x + PANEL_WIDTH - 26, y, 20, 20).build());
@@ -165,7 +166,7 @@ public class GuiHudEditor extends Screen
 
         rows.add((x, y) -> {
             this.labels.add(new Label(tr("theme"), x, y + 6));
-            this.themeButton = this.addRenderableWidget(Button.builder(Component.literal(this.style().getTheme().getDisplayName()), b -> {
+            this.themeButton = this.addRenderableWidget(Button3D.builder3d(Component.literal(this.style().getTheme().getDisplayName()), b -> {
                 this.style().applyTheme(this.style().getTheme().cycle(fi.dy.masa.malilib.gui.GuiBase.isShiftDown() == false));
                 this.rebuildWidgets();
             }).bounds(x + 70, y, PANEL_WIDTH - 78, 20).build());
@@ -212,7 +213,7 @@ public class GuiHudEditor extends Screen
         rows.add((x, y) -> {
             HudPreset preset = HudPreset.match(this.style().getElements());
             String name = preset != null ? preset.getDisplayName() : tr("preset_custom");
-            this.addRenderableWidget(Button.builder(Component.literal(tr("preset", name)), b -> {
+            this.addRenderableWidget(Button3D.builder3d(Component.literal(tr("preset", name)), b -> {
                 HudPreset current = HudPreset.match(this.style().getElements());
                 this.style().applyPreset(current != null ? current.cycle(fi.dy.masa.malilib.gui.GuiBase.isShiftDown() == false) : HudPreset.FULL);
                 this.rebuildWidgets();
@@ -224,7 +225,7 @@ public class GuiHudEditor extends Screen
             rows.add((x, y) -> {
                 boolean shown = this.style().isShown(element);
                 String label = (shown ? "§a✔ " : "§7✘ ") + element.getDisplayName();
-                this.addRenderableWidget(Button.builder(Component.literal(label), b -> {
+                this.addRenderableWidget(Button3D.builder3d(Component.literal(label), b -> {
                     this.style().setShown(element, this.style().isShown(element) == false);
                     this.rebuildWidgets();
                 }).bounds(x, y, PANEL_WIDTH - 8, 20).build());
@@ -292,7 +293,7 @@ public class GuiHudEditor extends Screen
 
     private void addToggle(int x, int y, int width, String label, Runnable action)
     {
-        this.addRenderableWidget(Button.builder(Component.literal(label), b -> {
+        this.addRenderableWidget(Button3D.builder3d(Component.literal(label), b -> {
             action.run();
             this.rebuildWidgets();
         }).bounds(x, y, width, 20).build());

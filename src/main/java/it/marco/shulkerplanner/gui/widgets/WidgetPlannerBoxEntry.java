@@ -20,7 +20,7 @@ import it.marco.shulkerplanner.data.Reminder;
 import it.marco.shulkerplanner.data.ShulkerBinding;
 import it.marco.shulkerplanner.data.ShulkerTracker;
 import it.marco.shulkerplanner.gui.GuiPlannerBoxes;
-import it.marco.shulkerplanner.gui.ui.FlatButton;
+import it.marco.shulkerplanner.gui.ui.PlannerButton;
 import it.marco.shulkerplanner.gui.ui.Theme;
 import it.marco.shulkerplanner.gui.ui.Ui;
 import it.marco.shulkerplanner.plan.BoxProgress;
@@ -82,15 +82,15 @@ public class WidgetPlannerBoxEntry extends WidgetListEntryBase<PlannedBox>
         int bx = x + width - bw - 4;
         this.buttonsX = bx;
 
-        FlatButton button = new FlatButton(bx, y + 4, bw, labelDone,
-                                           state == BoxState.DONE ? FlatButton.Style.SECONDARY : FlatButton.Style.PRIMARY,
+        PlannerButton button = new PlannerButton(bx, y + 4, bw, labelDone,
+                                           state == BoxState.DONE ? PlannerButton.Style.SECONDARY : PlannerButton.Style.PRIMARY,
                                            StringUtils.translate("shulkerplanner.gui.button.box_done.hover"));
         this.addButton(button, (btn, mb) -> {
             session.setBoxState(entry, state == BoxState.DONE ? (binding != null ? BoxState.FILLING : BoxState.TODO) : BoxState.DONE);
             gui.initGui();
         });
 
-        button = new FlatButton(bx, y + 24, bw, labelFollow, FlatButton.Style.SECONDARY, StringUtils.translate("shulkerplanner.gui.button.follow.hover"));
+        button = new PlannerButton(bx, y + 24, bw, labelFollow, PlannerButton.Style.SECONDARY, StringUtils.translate("shulkerplanner.gui.button.follow.hover"));
         button.setActive(followed);
         this.addButton(button, (btn, mb) -> {
             session.setFollowedBox(followed ? null : entry);
@@ -99,7 +99,7 @@ public class WidgetPlannerBoxEntry extends WidgetListEntryBase<PlannedBox>
 
         if (binding != null)
         {
-            button = new FlatButton(bx, y + 44, bw, labelSecond, FlatButton.Style.GHOST, StringUtils.translate("shulkerplanner.gui.button.unlink.hover"));
+            button = new PlannerButton(bx, y + 44, bw, labelSecond, PlannerButton.Style.GHOST, StringUtils.translate("shulkerplanner.gui.button.unlink.hover"));
             this.addButton(button, (btn, mb) -> {
                 if (GuiBase.isShiftDown())
                 {
@@ -114,7 +114,7 @@ public class WidgetPlannerBoxEntry extends WidgetListEntryBase<PlannedBox>
         }
         else if (BoxItemFactory.canGiveItems())
         {
-            button = new FlatButton(bx, y + 44, bw, labelSecond, FlatButton.Style.GHOST, StringUtils.translate("shulkerplanner.gui.button.give.hover"));
+            button = new PlannerButton(bx, y + 44, bw, labelSecond, PlannerButton.Style.GHOST, StringUtils.translate("shulkerplanner.gui.button.give.hover"));
             this.addButton(button, (btn, mb) -> {
                 ItemStack stack = BoxItemFactory.createBoxItem(project, entry, gui.getPlanBoxCount());
 
@@ -130,7 +130,7 @@ public class WidgetPlannerBoxEntry extends WidgetListEntryBase<PlannedBox>
         }
         else
         {
-            button = new FlatButton(bx, y + 44, bw, labelSecond, FlatButton.Style.GHOST, StringUtils.translate("shulkerplanner.gui.button.add_note_box.hover"));
+            button = new PlannerButton(bx, y + 44, bw, labelSecond, PlannerButton.Style.GHOST, StringUtils.translate("shulkerplanner.gui.button.add_note_box.hover"));
             this.addButton(button, (btn, mb) -> this.addReminder(gui, project, entry));
         }
     }
@@ -222,7 +222,7 @@ public class WidgetPlannerBoxEntry extends WidgetListEntryBase<PlannedBox>
         Ui.textShadow(ctx, "#" + box.getIndex(), ix + 20, iy + 1, Theme.TEXT);
         Ui.text(ctx, "/" + this.list.getGui().getPlanBoxCount(), ix + 20 + Ui.width("#" + box.getIndex()) + 1, iy + 1, Theme.TEXT_MUTED);
         Ui.text(ctx, box.isPure() ? StringUtils.translate("shulkerplanner.gui.label.box.pure")
-                                  : StringUtils.translate("shulkerplanner.gui.label.box.mixed", box.getTotals().size()), ix + 20, iy + 10, Theme.TEXT_MUTED);
+                                  : StringUtils.translate("shulkerplanner.gui.label.box.mixed", box.getTotals().size()), ix + 20, iy + 11, Theme.TEXT_MUTED);
 
         String chip;
 

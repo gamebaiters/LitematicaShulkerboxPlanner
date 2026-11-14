@@ -14,7 +14,7 @@ import fi.dy.masa.malilib.util.input.ScanCodes;
 
 import it.marco.shulkerplanner.data.PlannerProject;
 import it.marco.shulkerplanner.data.Reminder;
-import it.marco.shulkerplanner.gui.ui.FlatButton;
+import it.marco.shulkerplanner.gui.ui.PlannerButton;
 import it.marco.shulkerplanner.gui.widgets.WidgetListPlannerReminders;
 import it.marco.shulkerplanner.gui.widgets.WidgetPlannerReminderEntry;
 
@@ -93,13 +93,13 @@ public class GuiPlannerReminders extends GuiPlannerBase<Reminder, WidgetPlannerR
         this.textField.setValueWrapper(draft);
 
         String key = editing != null ? "shulkerplanner.gui.button.save_reminder" : "shulkerplanner.gui.button.add_reminder";
-        FlatButton button = new FlatButton(0, 0, -1, StringUtils.translate(key), FlatButton.Style.PRIMARY,
+        PlannerButton button = new PlannerButton(0, 0, -1, StringUtils.translate(key), PlannerButton.Style.PRIMARY,
                                            StringUtils.translate("shulkerplanner.gui.button.add_reminder.hover"));
         this.addFlowButton(button, (btn, mb) -> this.submit());
 
         if (editing != null)
         {
-            button = new FlatButton(0, 0, -1, StringUtils.translate("shulkerplanner.gui.button.cancel"), FlatButton.Style.GHOST);
+            button = new PlannerButton(0, 0, -1, StringUtils.translate("shulkerplanner.gui.button.cancel"), PlannerButton.Style.GHOST);
             this.addFlowButton(button, (btn, mb) -> {
                 editing = null;
                 draft = "";
@@ -107,7 +107,7 @@ public class GuiPlannerReminders extends GuiPlannerBase<Reminder, WidgetPlannerR
             });
         }
 
-        button = new FlatButton(0, 0, -1, StringUtils.translate("shulkerplanner.gui.button.remove_completed"), FlatButton.Style.SECONDARY);
+        button = new PlannerButton(0, 0, -1, StringUtils.translate("shulkerplanner.gui.button.remove_completed"), PlannerButton.Style.SECONDARY);
         this.addFlowButton(button, (btn, mb) -> {
             project.getReminders().removeIf(Reminder::isDone);
             this.onProjectChanged();

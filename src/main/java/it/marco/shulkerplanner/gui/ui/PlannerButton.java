@@ -8,10 +8,11 @@ import fi.dy.masa.malilib.gui.button.ButtonGeneric;
 import fi.dy.masa.malilib.render.GuiContext;
 
 /**
- * A flat button in the planner style. Variants for the main action, normal actions, quiet actions,
+ * A 3D button in the planner style: raised with a lit top and a thick bottom edge, pressed in when it's
+ * the selected tab or a toggle that is on. Variants for the main action, normal actions, quiet actions,
  * toggles (on/off with a check mark) and dangerous actions.
  */
-public class FlatButton extends ButtonGeneric
+public class PlannerButton extends ButtonGeneric
 {
     public enum Style
     {
@@ -30,7 +31,7 @@ public class FlatButton extends ButtonGeneric
     @Nullable private Boolean toggle;
     private int textColorOverride;
 
-    public FlatButton(int x, int y, int width, String text, Style style, String... hover)
+    public PlannerButton(int x, int y, int width, String text, Style style, String... hover)
     {
         super(x, y, width < 0 ? autoWidth(text, false, null) : width, HEIGHT, text, hover);
         this.style = style;
@@ -41,14 +42,14 @@ public class FlatButton extends ButtonGeneric
         return Ui.width(text) + 14 + (toggle ? 10 : 0) + (icon != null ? 14 : 0);
     }
 
-    public static FlatButton toggle(String text, boolean on, String... hover)
+    public static PlannerButton toggle(String text, boolean on, String... hover)
     {
-        FlatButton b = new FlatButton(0, 0, autoWidth(text, true, null), text, Style.SECONDARY, hover);
+        PlannerButton b = new PlannerButton(0, 0, autoWidth(text, true, null), text, Style.SECONDARY, hover);
         b.toggle = on;
         return b;
     }
 
-    public FlatButton setIcon(@Nullable ItemStack icon)
+    public PlannerButton setIcon(@Nullable ItemStack icon)
     {
         boolean hadIcon = this.icon != null;
         this.icon = icon;
@@ -61,19 +62,19 @@ public class FlatButton extends ButtonGeneric
         return this;
     }
 
-    public FlatButton setActive(boolean active)
+    public PlannerButton setActive(boolean active)
     {
         this.active = active;
         return this;
     }
 
-    public FlatButton setStyle(Style style)
+    public PlannerButton setStyle(Style style)
     {
         this.style = style;
         return this;
     }
 
-    public FlatButton setTextColor(int color)
+    public PlannerButton setTextColor(int color)
     {
         this.textColorOverride = color;
         return this;
@@ -94,63 +95,58 @@ public class FlatButton extends ButtonGeneric
 
         this.hovered = this.isMouseOver(mouseX, mouseY);
         boolean hover = this.hovered && this.enabled;
+        boolean on = this.toggle != null && this.toggle;
+        boolean pressed = this.enabled && (this.active || on);
         int x = this.x;
         int y = this.y;
         int w = this.width;
         int h = this.height;
-        int bg;
-        int border = 0;
-        int fg = Theme.TEXT;
+        Ui.Bevel bevel;
+        int fg;
 
         switch (this.style)
         {
             case PRIMARY -> {
-                bg = hover ? Theme.ACCENT_HOVER : Theme.ACCENT;
+                bevel = Ui.BEVEL_PRIMARY;
                 fg = 0xFFFFFFFF;
             }
             case DANGER -> {
-                bg = hover ? Theme.withAlpha(Theme.DANGER, 0x60) : Theme.DANGER_BG;
-                border = Theme.withAlpha(Theme.DANGER, 0xA0);
-                fg = Theme.DANGER;
+                bevel = Ui.BEVEL_DANGER;
+                fg = 0xFFFFE0E0;
             }
-            case GHOST -> {
-                bg = hover ? Theme.SURFACE_HOVER : 0;
+            case GHOST, TAB -> {
+                bevel = Ui.BEVEL_QUIET;
                 fg = hover ? Theme.TEXT : Theme.TEXT_DIM;
             }
-            case TAB -> {
-                bg = this.active ? Theme.ACCENT_BG : (hover ? Theme.SURFACE_HOVER : 0);
-                fg = this.active ? Theme.TEXT : (hover ? Theme.TEXT : Theme.TEXT_DIM);
-            }
             default -> {
-                bg = this.active ? Theme.ACCENT_BG : (hover ? Theme.SURFACE_HOVER : Theme.SURFACE_3);
-                border = this.active ? Theme.ACCENT : (hover ? Theme.BORDER_STRONG : Theme.BORDER);
+                bevel = Ui.BEVEL_SECONDARY;
+                fg = Theme.TEXT;
             }
         }
 
-        if (this.toggle != null && this.toggle && this.style == Style.SECONDARY)
+        if (pressed && this.style != Style.PRIMARY && this.style != Style.DANGER)
         {
-            border = Theme.withAlpha(Theme.ACCENT, 0xC0);
+            bevel = Ui.BEVEL_ACTIVE;
+            fg = Theme.TEXT;
+        }
+
+        if (hover)
+        {
+            bevel = bevel.hovered();
         }
 
         if (this.enabled == false)
         {
-            bg = this.style == Style.GHOST || this.style == Style.TAB ? 0 : Theme.withAlpha(Theme.SURFACE_2, 0xA0);
-            border = this.style == Style.GHOST || this.style == Style.TAB ? 0 : Theme.BORDER;
+            bevel = Ui.BEVEL_DISABLED;
             fg = Theme.TEXT_MUTED;
         }
 
-        if (border != 0)
-        {
-            Ui.panel(ctx, x, y, w, h, bg, border);
-        }
-        else if (bg != 0)
-        {
-            Ui.panel(ctx, x, y, w, h, bg);
-        }
+        LayoutProbe.add(LayoutProbe.Kind.BUTTON, this.displayString, x, y, w, h);
+        Ui.button3d(ctx, x, y, w, h, bevel, pressed);
 
         if (this.style == Style.TAB && this.active)
         {
-            Ui.rect(ctx, x, y + 2, 2, h - 4, Theme.ACCENT);
+            Ui.rect(ctx, x + 2, y + 3, 2, h - 5, Theme.ACCENT_HOVER);
         }
 
         if (this.textColorOverride != 0 && this.enabled)
@@ -159,15 +155,14 @@ public class FlatButton extends ButtonGeneric
         }
 
         int contentWidth = Ui.width(this.displayString) + (this.icon != null ? 14 : 0) + (this.toggle != null ? 10 : 0);
-        int cx = this.style == Style.TAB ? x + 6 : x + (w - contentWidth) / 2;
-        int ty = y + (h - 8) / 2;
+        int cx = this.style == Style.TAB ? x + 7 : x + (w - contentWidth) / 2;
+        int ty = Ui.buttonTextY(y, h, pressed);
 
         if (this.toggle != null)
         {
-            boolean on = this.toggle;
             int bx = cx;
-            int by = y + (h - 7) / 2;
-            Ui.rect(ctx, bx, by, 7, 7, this.enabled ? (on ? Theme.ACCENT : Theme.BORDER_STRONG) : Theme.BORDER);
+            int by = ty;
+            Ui.rect(ctx, bx, by, 7, 7, this.enabled ? (on ? Theme.ACCENT_HOVER : Theme.BORDER_STRONG) : Theme.BORDER);
             Ui.rect(ctx, bx + 1, by + 1, 5, 5, on ? (this.enabled ? Theme.ACCENT : Theme.ACCENT_DIM) : Theme.SLOT_BG);
 
             if (on)
@@ -185,10 +180,13 @@ public class FlatButton extends ButtonGeneric
 
         if (this.icon != null)
         {
-            Ui.item(ctx, this.icon, cx, y + (h - 12) / 2, 12, false);
+            Ui.item(ctx, this.icon, cx, ty - 2, 12, false);
             cx += 14;
         }
 
-        Ui.text(ctx, this.displayString, cx, ty, fg);
+        if (this.displayString.isEmpty() == false)
+        {
+            Ui.textShadow(ctx, this.displayString, cx, ty, fg);
+        }
     }
 }

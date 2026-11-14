@@ -17,7 +17,7 @@ import it.marco.shulkerplanner.config.Configs;
 import it.marco.shulkerplanner.data.MaterialRow;
 import it.marco.shulkerplanner.data.PlannerProject;
 import it.marco.shulkerplanner.data.ProjectStorage;
-import it.marco.shulkerplanner.gui.ui.FlatButton;
+import it.marco.shulkerplanner.gui.ui.PlannerButton;
 import it.marco.shulkerplanner.gui.ui.Theme;
 import it.marco.shulkerplanner.gui.widgets.WidgetListPlannerBoxes;
 import it.marco.shulkerplanner.gui.widgets.WidgetPlannerBoxEntry;
@@ -96,7 +96,7 @@ public class GuiPlannerBoxes extends GuiPlannerBase<PlannedBox, WidgetPlannerBox
             return;
         }
 
-        FlatButton button = this.createValueButton("shulkerplanner.gui.button.pack_mode", project.getPackMode().getDisplayName(), project.getPackMode().getHoverText());
+        PlannerButton button = this.createValueButton("shulkerplanner.gui.button.pack_mode", project.getPackMode().getDisplayName(), project.getPackMode().getHoverText());
         this.addFlowButton(button, (btn, mb) -> {
             project.setPackMode(project.getPackMode().cycle(mb == ScanCodes.OFFSET_MOUSE_LEFT));
             this.onPackingOptionsChanged();
@@ -121,7 +121,7 @@ public class GuiPlannerBoxes extends GuiPlannerBase<PlannedBox, WidgetPlannerBox
             this.initGui();
         });
 
-        button = new FlatButton(0, 0, -1, (showMoreOptions ? "▴ " : "▾ ") + StringUtils.translate("shulkerplanner.gui.button.more_options"), FlatButton.Style.GHOST);
+        button = new PlannerButton(0, 0, -1, (showMoreOptions ? "▴ " : "▾ ") + StringUtils.translate("shulkerplanner.gui.button.more_options"), PlannerButton.Style.GHOST);
         this.addFlowButton(button, (btn, mb) -> {
             showMoreOptions = ! showMoreOptions;
             this.initGui();
@@ -189,7 +189,7 @@ public class GuiPlannerBoxes extends GuiPlannerBase<PlannedBox, WidgetPlannerBox
         if (this.session.isPlanLocked())
         {
             button = this.createAction("shulkerplanner.gui.button.reset_plan", StringUtils.translate("shulkerplanner.gui.button.reset_plan.hover"));
-            button.setStyle(FlatButton.Style.DANGER);
+            button.setStyle(PlannerButton.Style.DANGER);
             this.addFlowButton(button, (btn, mb) -> {
                 if (GuiBase.isShiftDown())
                 {

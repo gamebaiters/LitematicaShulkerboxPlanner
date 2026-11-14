@@ -32,6 +32,7 @@ cp "$(pick 07b_raw_materials)"           "$OUT/screenshots/raw-materials.png"
 cp "$(pick 07c_settings)"                "$OUT/screenshots/settings.png"
 cp "$(pick 08_packing_assistant_unlinked)" "$OUT/screenshots/packing-assistant-unlinked.png"
 cp "$(pick 08_packing_assistant)"        "$OUT/screenshots/packing-assistant.png"
+cp "$(pick 12b_panel_moved_resized)"    "$OUT/screenshots/packing-assistant-moved.png"
 cp "$(pick 09_litematica_main_menu)"     "$OUT/screenshots/main-menu.png"
 cp "$(pick 10_config)"                   "$OUT/screenshots/config.png"
 
