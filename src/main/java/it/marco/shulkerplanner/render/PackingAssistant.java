@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
@@ -251,6 +252,14 @@ public class PackingAssistant
         {
             panelVisible = false;
             return;
+        }
+
+        if (drag != Drag.NONE)
+        {
+            // Move, resize and the scroll bar follow the mouse every frame, so they work even when another mod
+            // takes the mouseDragged events of the container screen (they only end with the button release)
+            Minecraft mc = Minecraft.getInstance();
+            onMouseDragged(screen, mc.mouseHandler.getScaledXPos(mc.getWindow()), mc.mouseHandler.getScaledYPos(mc.getWindow()));
         }
 
         PlannerSession session = PlannerSession.INSTANCE;
@@ -1021,6 +1030,12 @@ public class PackingAssistant
      */
     public static boolean onMouseClicked(AbstractContainerScreen<?> screen, double mouseX, double mouseY, int button)
     {
+        if (drag != Drag.NONE)
+        {
+            // The release of the last drag was lost (outside the window): end it now
+            onMouseReleased(screen);
+        }
+
         pressedInPanel = false;
 
         if (isOurs(screen) == false || isMouseOverPanel(mouseX, mouseY) == false)
@@ -1030,7 +1045,8 @@ public class PackingAssistant
 
         pressedInPanel = true;
 
-        if (button != 0)
+        // Minecraft 26.3 numbers the mouse buttons like SDL: left is 1 (InputConstants.MOUSE_BUTTON_LEFT), not GLFW's 0
+        if (button != InputConstants.MOUSE_BUTTON_LEFT)
         {
             return true;
         }

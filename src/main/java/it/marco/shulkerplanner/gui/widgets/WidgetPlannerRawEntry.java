@@ -7,6 +7,7 @@ import javax.annotation.Nullable;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.world.item.ItemStack;
 
+import fi.dy.masa.malilib.util.input.ScanCodes;
 import fi.dy.masa.malilib.gui.GuiBase;
 import fi.dy.masa.malilib.gui.widgets.WidgetListEntryBase;
 import fi.dy.masa.malilib.render.GuiContext;
@@ -91,7 +92,7 @@ public class WidgetPlannerRawEntry extends WidgetListEntryBase<RawRow>
                                                   StringUtils.translate("shulkerplanner.gui.button.recipe.hover"));
                 cycle.setPosition(xRight - cycle.getWidth(), y + 3);
                 this.addButton(cycle, (btn, mb) -> {
-                    int next = Math.floorMod(index + (mb == 0 ? 1 : -1), recipes.size());
+                    int next = Math.floorMod(index + (mb == ScanCodes.OFFSET_MOUSE_LEFT ? 1 : -1), recipes.size());
                     project.setRecipeChoice(id, recipes.get(next).id());
                     gui.onRecipeOptionsChanged();
                 });

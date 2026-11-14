@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.1.1 - Minecraft 26.3
+
+**Fixes**
+- The buttons of the packing assistant panel did nothing, and the panel could not be moved or resized: Minecraft 26.3 numbers the left mouse button differently, and the panel ignored it. Only the mouse wheel worked.
+- The panel now gets the mouse before other mods (malilib, Item Scroller, Tweakeroo, Mouse Tweaks…), so they can't take a click meant for it; moving and resizing follow the mouse every frame and end when the button is released.
+- The recipe button of the Raw materials tab went to the previous recipe on left click: left click is now the next recipe, right click the previous one.
+- The game tests now also drive the panel with the real mouse (through Minecraft's input handling), with and without Item Scroller, Tweakeroo, Mouse Tweaks and MiniHUD installed.
+
 ## 2.1.0 - Minecraft 26.3
 
 **Packing assistant panel**

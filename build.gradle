@@ -43,6 +43,12 @@ dependencies {
 
 	// malilib needs Fabric API at runtime (dev client and game tests only, the mod itself doesn't use it)
 	runtimeOnly "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+
+	// Other mods in the dev client and game tests, to check that they don't take the mouse from the panel:
+	// LSP_EXTRA_MODS=<folder with Item Scroller, Tweakeroo, Mouse Tweaks ... jars>
+	if (System.getenv("LSP_EXTRA_MODS")) {
+		runtimeOnly fileTree(dir: System.getenv("LSP_EXTRA_MODS"), include: "*.jar")
+	}
 	gametestImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
 	compileOnly "com.google.code.findbugs:jsr305:3.0.2"
 	compileOnly("com.terraformersmc:modmenu:${project.modmenu_version}") { transitive = false }

@@ -23,6 +23,8 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.ItemContainerContents;
 import net.minecraft.world.level.block.entity.ShulkerBoxBlockEntity;
 
+import com.mojang.blaze3d.platform.InputConstants;
+import net.fabricmc.fabric.api.client.gametest.v1.TestInput;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
@@ -908,6 +910,8 @@ public class ShulkerPlannerClientGameTest implements FabricClientGameTest
         check(b0[0] == left + 176 + 4 && b0[1] == top, "the panel is not anchored next to the container screen");
         check(b0[3] == 167, "the panel is not as tall as the container screen: " + b0[3]);
 
+        this.realMouseChecks(ctx, b0);
+
         // Mouse wheel over the list
         int[] s0 = ctx.computeOnClient(mc -> PackingAssistant.getScroll());
         check(s0[0] == 0 && s0[1] > 0, "the list of the panel should be scrollable, max scroll " + s0[1]);
@@ -1035,6 +1039,88 @@ public class ShulkerPlannerClientGameTest implements FabricClientGameTest
 
         ctx.runOnClient(mc -> mc.player.closeContainer());
         ctx.waitTicks(3);
+    }
+
+    /**
+     * The panel with the real mouse: GLFW events through MouseHandler, where malilib, Item Scroller, Tweakeroo,
+     * Mouse Tweaks and Fabric's screen events see them first. Calling the screen's mouseClicked directly skips all that.
+     */
+    private void realMouseChecks(ClientGameTestContext ctx, int[] b0)
+    {
+        TestInput input = ctx.getInput();
+        double scale = ctx.computeOnClient(mc -> mc.getWindow().getGuiScale());
+        log("Real mouse checks at GUI scale %.0f, mods loaded: %s", scale, ctx.computeOnClient(mc ->
+            String.join(", ", net.fabricmc.loader.api.FabricLoader.getInstance().getAllMods().stream()
+                .map(m -> m.getMetadata().getId())
+                .filter(id -> id.matches("itemscroller|tweakeroo|mousetweaks|minihud|litematica|malilib")).sorted().toList())));
+
+        // Wheel over the list
+        input.setCursorPos((b0[0] + 30.5) * scale, (b0[1] + 60.5) * scale);
+        ctx.waitTicks(2);
+        input.scroll(-1);
+        ctx.waitTicks(2);
+        int[] s1 = ctx.computeOnClient(mc -> PackingAssistant.getScroll());
+        log("Real wheel: scroll %d / %d", s1[0], s1[1]);
+        check(s1[1] > 0 && s1[0] == Math.min(20, s1[1]), "the real mouse wheel did not scroll the panel list");
+        input.scroll(10);
+        ctx.waitTicks(2);
+        check(ctx.computeOnClient(mc -> PackingAssistant.getScroll())[0] == 0, "the real mouse wheel did not scroll the panel back up");
+
+        // Drag by the title bar
+        input.setCursorPos((b0[0] + 60.5) * scale, (b0[1] + 8.5) * scale);
+        ctx.waitTicks(2);
+        input.holdMouse(InputConstants.MOUSE_BUTTON_LEFT);
+        ctx.waitTicks(2);
+        input.moveCursor(15 * scale, 10 * scale);
+        ctx.waitTicks(2);
+        input.moveCursor(15 * scale, 10 * scale);
+        ctx.waitTicks(2);
+        input.releaseMouse(InputConstants.MOUSE_BUTTON_LEFT);
+        ctx.waitTicks(2);
+        int[] b1 = ctx.computeOnClient(mc -> PackingAssistant.getPanelBounds());
+        log("Real drag: panel from %d,%d to %d,%d", b0[0], b0[1], b1[0], b1[1]);
+        check(b1[0] == b0[0] + 30 && b1[1] == b0[1] + 20, "dragging the title bar with the real mouse did not move the panel");
+        boolean empty = ctx.computeOnClient(mc -> mc.player.containerMenu.getCarried().isEmpty());
+        check(empty, "the real mouse picked up an item while dragging the panel");
+
+        // Resize from the corner
+        input.setCursorPos((b1[0] + b1[2] - 2.5) * scale, (b1[1] + b1[3] - 2.5) * scale);
+        ctx.waitTicks(2);
+        input.holdMouse(InputConstants.MOUSE_BUTTON_LEFT);
+        ctx.waitTicks(2);
+        input.moveCursor(-20 * scale, -30 * scale);
+        ctx.waitTicks(2);
+        input.releaseMouse(InputConstants.MOUSE_BUTTON_LEFT);
+        ctx.waitTicks(2);
+        int[] b2 = ctx.computeOnClient(mc -> PackingAssistant.getPanelBounds());
+        log("Real resize: %dx%d to %dx%d", b1[2], b1[3], b2[2], b2[3]);
+        check(b2[0] == b1[0] && b2[1] == b1[1] && b2[2] == b1[2] - 20 && b2[3] == b1[3] - 30,
+              "resizing the panel with the real mouse did not work");
+
+        // A button: reset puts it back
+        input.setCursorPos((b2[0] + b2[2] - 6 - 7 + 0.5) * scale, (b2[1] + 10.5) * scale);
+        ctx.waitTicks(2);
+        input.pressMouse(InputConstants.MOUSE_BUTTON_LEFT);
+        ctx.waitTicks(3);
+        int[] b3 = ctx.computeOnClient(mc -> PackingAssistant.getPanelBounds());
+        log("Real click on reset: panel at %d,%d %dx%d", b3[0], b3[1], b3[2], b3[3]);
+        check(b3[0] == b0[0] && b3[1] == b0[1] && b3[2] == b0[2] && b3[3] == b0[3], "clicking the reset button with the real mouse did nothing");
+
+        // Away from the panel the mouse works as usual: a click on a shulker slot picks the item up
+        int left = ctx.computeOnClient(mc -> (mc.gui.screen().width - 176) / 2);
+        int top = ctx.computeOnClient(mc -> (mc.gui.screen().height - 167) / 2);
+        input.setCursorPos((left + 8 + 3 * 18 + 8.5) * scale, (top + 18 + 8.5) * scale);
+        ctx.waitTicks(2);
+        input.pressMouse(InputConstants.MOUSE_BUTTON_LEFT);
+        ctx.waitTicks(2);
+        boolean picked = ctx.computeOnClient(mc -> mc.player.containerMenu.getCarried().isEmpty() == false);
+        check(picked, "a real click on a slot next to the panel did not pick up the item");
+        ctx.waitTicks(10); // not a double click
+        input.pressMouse(InputConstants.MOUSE_BUTTON_LEFT);
+        ctx.waitTicks(2);
+        check(ctx.computeOnClient(mc -> mc.player.containerMenu.getCarried().isEmpty()), "the picked up item was not put back");
+        input.setCursorPos(2, 2);
+        ctx.waitTicks(2);
     }
 
     // ------------------------------------------------------------------ layout: nothing overlaps, at every GUI scale
@@ -1423,11 +1509,12 @@ public class ShulkerPlannerClientGameTest implements FabricClientGameTest
     }
 
     /**
-     * A left click as GLFW reports it (button 0), what vanilla screens get from the mouse
+     * A left click as the game reports it: Minecraft 26.3 numbers the mouse buttons like SDL, left is 1
+     * (InputConstants.MOUSE_BUTTON_LEFT, the same as malilib's ScanCodes.OFFSET_MOUSE_LEFT), not GLFW's 0
      */
     private static MouseButtonEvent leftClick(double x, double y)
     {
-        return new MouseButtonEvent(x, y, new MouseButtonInfo(0, 0));
+        return new MouseButtonEvent(x, y, new MouseButtonInfo(InputConstants.MOUSE_BUTTON_LEFT, 0));
     }
 
     private static MouseButtonEvent click(double x, double y)
