@@ -23,40 +23,138 @@ public class PlanRebaser
     public static List<PlannedBox> rebase(List<PlannedBox> kept, List<ItemRequirement> requirements, PackMode mode,
                                           boolean roundUpStacks, boolean fillSpare, int nextId)
     {
-        Map<String, Long> covered = new HashMap<>();
+        return rebase(kept, List.of(), requirements, mode, roundUpStacks, fillSpare, nextId);
+    }
 
-        for (PlannedBox box : kept)
-        {
-            box.getTotals().forEach((id, count) -> covered.merge(id, (long) count, Long::sum));
-        }
-
-        List<ItemRequirement> rest = new ArrayList<>();
+    /**
+     * Updates a locked plan:
+     * <ul>
+     *   <li>{@code frozen} boxes (e.g. DONE) stay completely unchanged (same instance, contents, id and number).</li>
+     *   <li>{@code expandable} boxes (e.g. FILLING or linked TODO) keep their existing stacks, id and number,
+     *       and use any partial stacks / free slots to absorb newly added requirements before creating new boxes.</li>
+     * </ul>
+     */
+    public static List<PlannedBox> rebase(List<PlannedBox> frozen, List<PlannedBox> expandable,
+                                          List<ItemRequirement> requirements, PackMode mode,
+                                          boolean roundUpStacks, boolean fillSpare, int nextId)
+    {
+        List<ItemRequirement> normalized = new ArrayList<>();
 
         for (ItemRequirement req : requirements)
         {
-            if (req.boxable() == false)
+            if (req.count() <= 0 || req.maxStack() <= 0 || req.boxable() == false)
             {
                 continue;
             }
 
+            if (roundUpStacks && req.getRemainder() > 0)
+            {
+                int count = (req.getFullStacks() + 1) * req.maxStack();
+                req = new ItemRequirement(req.id(), req.proto(), count, req.maxStack(), req.boxable(), req.sortKey());
+            }
+
+            normalized.add(req);
+        }
+
+        Map<String, Long> covered = new HashMap<>();
+
+        for (PlannedBox box : frozen)
+        {
+            box.getTotals().forEach((id, count) -> covered.merge(id, (long) count, Long::sum));
+        }
+
+        for (PlannedBox box : expandable)
+        {
+            box.getTotals().forEach((id, count) -> covered.merge(id, (long) count, Long::sum));
+        }
+
+        Map<String, Long> remaining = new HashMap<>();
+
+        for (ItemRequirement req : normalized)
+        {
             long left = req.count() - covered.getOrDefault(req.id(), 0L);
 
             if (left > 0)
             {
-                rest.add(new ItemRequirement(req.id(), req.proto(), (int) left, req.maxStack(), req.boxable(), req.sortKey()));
+                remaining.merge(req.id(), left, Long::sum);
             }
         }
 
-        List<PlannedBox> added = ShulkerPacker.packBoxes(rest, mode, roundUpStacks, fillSpare);
-        List<PlannedBox> result = new ArrayList<>(kept.size() + added.size());
+        List<PlannedBox> result = new ArrayList<>(frozen.size() + expandable.size());
         Set<Integer> usedNumbers = new TreeSet<>();
 
-        for (PlannedBox box : kept)
+        for (PlannedBox box : frozen)
         {
             usedNumbers.add(box.getIndex());
             result.add(box);
         }
 
+        for (PlannedBox box : expandable)
+        {
+            List<PlannedStack> slots = new ArrayList<>(box.getSlots());
+            boolean changed = false;
+
+            for (int i = 0; i < slots.size(); ++i)
+            {
+                PlannedStack stack = slots.get(i);
+                long rem = remaining.getOrDefault(stack.id(), 0L);
+                int space = stack.item().maxStack() - stack.count();
+
+                if (rem > 0 && space > 0)
+                {
+                    int add = (int) Math.min(space, rem);
+                    slots.set(i, new PlannedStack(stack.item(), stack.count() + add, stack.spare()));
+                    remaining.put(stack.id(), rem - add);
+                    changed = true;
+                }
+            }
+
+            for (ItemRequirement req : normalized)
+            {
+                if (slots.size() >= PlannedBox.SLOTS)
+                {
+                    break;
+                }
+
+                long rem = remaining.getOrDefault(req.id(), 0L);
+
+                while (rem > 0 && slots.size() < PlannedBox.SLOTS)
+                {
+                    int take = (int) Math.min(req.maxStack(), rem);
+                    slots.add(new PlannedStack(req, take));
+                    rem -= take;
+                    remaining.put(req.id(), rem);
+                    changed = true;
+                }
+            }
+
+            PlannedBox updated = box;
+
+            if (changed)
+            {
+                updated = new PlannedBox(slots);
+                updated.setId(box.getId());
+                updated.setIndex(box.getIndex());
+            }
+
+            usedNumbers.add(updated.getIndex());
+            result.add(updated);
+        }
+
+        List<ItemRequirement> rest = new ArrayList<>();
+
+        for (ItemRequirement req : normalized)
+        {
+            long left = remaining.getOrDefault(req.id(), 0L);
+
+            if (left > 0)
+            {
+                rest.add(new ItemRequirement(req.id(), req.proto(), (int) left, req.maxStack(), req.boxable(), req.sortKey()));
+                remaining.remove(req.id());
+            }
+        }
+
+        List<PlannedBox> added = ShulkerPacker.packBoxes(rest, mode, roundUpStacks, fillSpare);
         int number = 1;
         int id = nextId;
 

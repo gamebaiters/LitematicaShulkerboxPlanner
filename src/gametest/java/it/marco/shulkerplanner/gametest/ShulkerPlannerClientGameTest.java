@@ -62,6 +62,7 @@ import it.marco.shulkerplanner.gui.ui.LayoutProbe;
 import it.marco.shulkerplanner.gui.ui.Ui;
 import it.marco.shulkerplanner.render.PackingAssistant;
 import it.marco.shulkerplanner.plan.BoxProgress;
+import it.marco.shulkerplanner.plan.BoxState;
 import it.marco.shulkerplanner.plan.PlannedBox;
 import it.marco.shulkerplanner.plan.PlannedStack;
 import it.marco.shulkerplanner.plan.ShulkerPlan;
@@ -1450,6 +1451,27 @@ public class ShulkerPlannerClientGameTest implements FabricClientGameTest
             check(session.isPlanOutdated() == false, "the updated plan is up to date");
             check(session.getBinding(session.getPlan().getBoxById(2)) != null || session.getProject().getBindings().size() == 1, "the link stays");
             log("Links: updated plan %s", describePlan());
+
+            // A FILLING (not DONE) box with free slots absorbs newly added items on material list refresh
+            PlannedBox box3 = session.getPlan().getBoxes().stream()
+                    .filter(bx -> session.isBoxDone(bx) == false && bx.getFreeSlots() > 0)
+                    .findFirst().orElse(null);
+            check(box3 != null, "expected an unfinished box with free slots");
+            int box3Id = box3.getId();
+            session.setBoxState(box3, BoxState.FILLING);
+            changed.replaceEntries(List.of(
+                    entry("stone_bricks", 27 * 64 + 640, 27 * 64 + 100),
+                    entry("glass", 300, 300),
+                    entry("oak_stairs", 100, 100),
+                    entry("lantern", 20, 20),
+                    entry("torch", 64, 64)));
+            check(session.requestMaterialListRefresh(), "material list refresh should succeed");
+            check(session.isPlanOutdated() == false, "refreshing materials updates the locked plan");
+            PlannedBox updatedBox3 = session.getPlan().getBoxById(box3Id);
+            check(updatedBox3 != null && updatedBox3.getTotals().getOrDefault("minecraft:torch", 0) == 64,
+                  "filling box #" + box3Id + " should include newly added torches, got " + (updatedBox3 != null ? updatedBox3.getTotals() : "null"));
+            check(session.getPlan().getBoxes().stream().anyMatch(bx -> bx.getIndex() == 2 && bx.getSignature().equals(box2)),
+                  "DONE box #2 must stay unchanged after adding items");
         });
 
         // 7. Raw materials: stone bricks become cobblestone (stone from the furnace)
@@ -1648,11 +1670,18 @@ public class ShulkerPlannerClientGameTest implements FabricClientGameTest
     private static class TestMaterialList extends MaterialListBase
     {
         private final String name;
+        private List<MaterialListEntry> nextEntries;
 
         private TestMaterialList(String name, List<MaterialListEntry> entries)
         {
             this.name = name;
+            this.nextEntries = new ArrayList<>(entries);
             this.setMaterialListEntries(new ArrayList<>(entries));
+        }
+
+        private void replaceEntries(List<MaterialListEntry> entries)
+        {
+            this.nextEntries = new ArrayList<>(entries);
         }
 
         @Override
@@ -1670,7 +1699,7 @@ public class ShulkerPlannerClientGameTest implements FabricClientGameTest
         @Override
         public void reCreateMaterialList()
         {
-            this.setMaterialListEntries(new ArrayList<>(this.getMaterialsAll()));
+            this.setMaterialListEntries(new ArrayList<>(this.nextEntries));
         }
     }
 }

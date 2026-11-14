@@ -69,6 +69,7 @@ public class PlannerSession implements IClientTickHandler
     /** The bound box whose shulker box screen is open right now, -1 if none */
     private int openBoxId = -1;
     private boolean waitingForMaterialList;
+    private boolean autoUpdatePlanOnRefresh;
     private int tickCounter;
     @Nullable private Object lastSelectedPlacement;
     @Nullable private String unplannedSelection;
@@ -221,12 +222,15 @@ public class PlannerSession implements IClientTickHandler
             return false;
         }
 
-        List<MaterialListEntry> before = this.materialList.getMaterialsAll();
+        List<MaterialListEntry> before = new ArrayList<>(this.materialList.getMaterialsAll());
         this.waitingForMaterialList = true;
+        this.autoUpdatePlanOnRefresh = true;
         this.materialList.reCreateMaterialList();
 
         // Schematic based lists are re-created immediately, placement based lists run a task
-        if (this.materialList.getMaterialsAll() != before)
+        if (this.waitingForMaterialList &&
+            ((this.materialList instanceof MaterialListPlacement) == false ||
+             this.materialList.getMaterialsAll().equals(before) == false))
         {
             this.onMaterialListCompleted(this.materialList);
         }
@@ -238,11 +242,21 @@ public class PlannerSession implements IClientTickHandler
     {
         if (list == this.materialList && this.project != null)
         {
+            boolean autoUpdate = this.autoUpdatePlanOnRefresh;
+            this.autoUpdatePlanOnRefresh = false;
             this.waitingForMaterialList = false;
             this.importMaterials();
             this.refreshInventory(false);
-            this.invalidate();
-            this.notifyUpdate();
+
+            if (autoUpdate && this.project.isLocked())
+            {
+                this.updateLockedPlan();
+            }
+            else
+            {
+                this.invalidate();
+                this.notifyUpdate();
+            }
         }
     }
 
@@ -537,19 +551,24 @@ public class PlannerSession implements IClientTickHandler
                 return;
             }
 
-            List<PlannedBox> kept = new ArrayList<>();
+            List<PlannedBox> frozen = new ArrayList<>();
+            List<PlannedBox> expandable = new ArrayList<>();
 
             for (PlannedBox box : p.getLockedBoxes())
             {
-                if (p.isBoxStarted(box))
+                if (p.isBoxDone(box))
                 {
-                    kept.add(box);
+                    frozen.add(box);
+                }
+                else if (p.isBoxStarted(box))
+                {
+                    expandable.add(box);
                 }
             }
 
             this.listedCounts = null;
             this.rawResult = null;
-            List<PlannedBox> boxes = PlanRebaser.rebase(kept, this.getRequirements(), p.getPackMode(),
+            List<PlannedBox> boxes = PlanRebaser.rebase(frozen, expandable, this.getRequirements(), p.getPackMode(),
                                                         p.getRoundUpStacks(), p.getFillSpareSlots(), p.getNextBoxId());
             p.lock(boxes, this.getRequiredCounts());
             p.pruneBoxes(boxes);

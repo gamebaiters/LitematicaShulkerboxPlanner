@@ -61,6 +61,27 @@ class PlanRebaserTest
     }
 
     @Test
+    void expandableBoxAbsorbsAddedItemsIntoPartialStacksAndFreeSlots()
+    {
+        List<ItemRequirement> initial = List.of(req("stone", 32, 1), req("glass", 64, 2));
+        List<PlannedBox> plan = ShulkerPacker.packBoxes(initial, PackMode.SMART, false, false);
+        assertEquals(1, plan.size());
+
+        PlannedBox filling = plan.get(0);
+        // Material list updated: +48 stone (total 80) and +100 lantern
+        List<ItemRequirement> updated = List.of(req("stone", 80, 1), req("glass", 64, 2), req("lantern", 100, 3));
+        List<PlannedBox> rebased = PlanRebaser.rebase(List.of(), List.of(filling), updated, PackMode.SMART, false, false, 100);
+
+        assertEquals(1, rebased.size(), "new items fit inside the existing box's free slots");
+        PlannedBox box = rebased.get(0);
+        assertEquals(filling.getId(), box.getId());
+        assertEquals(filling.getIndex(), box.getIndex());
+        assertEquals(80, box.getTotals().get("stone"));
+        assertEquals(64, box.getTotals().get("glass"));
+        assertEquals(100, box.getTotals().get("lantern"));
+    }
+
+    @Test
     void countModeRequired()
     {
         assertEquals(100, CountMode.TOTAL.required(100, 40, 1));
