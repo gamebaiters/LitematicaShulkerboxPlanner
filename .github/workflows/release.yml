@@ -1,0 +1,106 @@
+name: Release
+
+# Every push to main with a new mod_version in gradle.properties publishes that version as a GitHub Release:
+# tag vX.Y.Z (made on the pushed commit if it doesn't exist yet), the mod jar, the CHANGELOG section as notes.
+# A version that already has a release is skipped, so normal pushes do nothing here.
+# It can also be started by hand (Actions -> Release -> Run workflow), optionally for an existing tag.
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to publish (empty: the version in gradle.properties)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Version to publish
+        id: version
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          if [ -n "$INPUT_TAG" ]; then
+            case "$INPUT_TAG" in
+              v[0-9]*) tag="$INPUT_TAG" ;;
+              *) echo "Not a version tag: $INPUT_TAG"; exit 1 ;;
+            esac
+          else
+            tag="v$(grep -E '^mod_version=' gradle.properties | cut -d= -f2 | tr -d '[:space:]')"
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          if gh release view "$tag" > /dev/null 2>&1; then
+            echo "Release $tag already exists: nothing to do"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+          if git rev-parse -q --verify "refs/tags/$tag" > /dev/null; then
+            echo "tag_exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag_exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build the tagged sources
+        if: steps.version.outputs.skip == 'false' && steps.version.outputs.tag_exists == 'true'
+        run: git checkout --detach "${{ steps.version.outputs.tag }}"
+
+      - uses: actions/setup-java@v4
+        if: steps.version.outputs.skip == 'false'
+        with:
+          distribution: temurin
+          java-version: 25
+
+      - uses: gradle/actions/setup-gradle@v4
+        if: steps.version.outputs.skip == 'false'
+
+      - name: Build and test
+        if: steps.version.outputs.skip == 'false'
+        run: ./gradlew build --no-daemon
+
+      - name: Release notes and jar
+        id: files
+        if: steps.version.outputs.skip == 'false'
+        run: |
+          tag="${{ steps.version.outputs.tag }}"
+          version="${tag#v}"
+          mc="$(grep -E '^minecraft_version=' gradle.properties | cut -d= -f2 | tr -d '[:space:]')"
+          jar="$(ls build/libs/*-"$version".jar | grep -v -e '-sources' -e '-dev' | head -n 1)"
+          test -f "$jar" || { echo "jar for $version not found in build/libs"; ls build/libs; exit 1; }
+          # The CHANGELOG section of this version, without its heading
+          awk -v v="$version" '
+            /^## / { if (found) exit; if (index($0, "## " v " ") == 1 || $0 == "## " v) { found = 1; next } }
+            found { print }
+          ' CHANGELOG.md > notes.md
+          if [ ! -s notes.md ]; then echo "See CHANGELOG.md" > notes.md; fi
+          printf '\n---\nFabric, Minecraft %s. Needs Litematica, MaLiLib and Fabric API.\n' "$mc" >> notes.md
+          echo "jar=$jar" >> "$GITHUB_OUTPUT"
+          echo "title=Shulker Planner $version (Minecraft $mc)" >> "$GITHUB_OUTPUT"
+          cat notes.md
+
+      - name: Publish the release
+        if: steps.version.outputs.skip == 'false'
+        run: |
+          tag="${{ steps.version.outputs.tag }}"
+          if [ "${{ steps.version.outputs.tag_exists }}" = "true" ]; then
+            gh release create "$tag" "${{ steps.files.outputs.jar }}" --title "${{ steps.files.outputs.title }}" --notes-file notes.md --verify-tag
+          else
+            gh release create "$tag" "${{ steps.files.outputs.jar }}" --title "${{ steps.files.outputs.title }}" --notes-file notes.md --target "$GITHUB_SHA"
+          fi
